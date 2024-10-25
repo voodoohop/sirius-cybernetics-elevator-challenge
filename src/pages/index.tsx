@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { AlertCircle } from 'lucide-react'
-import { getElevatorPrompt, getMarvinPrompt, getGuideMessages } from '../prompts.ts';
+import { getElevatorPrompt, getMarvinPrompt, getGuideMessages } from '../prompts';
 
 const FLOORS = 5
 const INITIAL_FLOOR = 3
@@ -44,53 +44,43 @@ type UiState = {
 type GameAction =
   | { type: 'CHEAT_CODE' }
   | { type: 'ADD_MESSAGE'; message: Message }
-  | { type: 'SWITCH_PERSONA'; persona: Persona };
+  | { type: 'SWITCH_PERSONA'; persona: Persona }
+  | { type: 'ROBOT_RESPONSE'; response: any };
 
 
 // Implement the reducer function
 const messagesToGameState = (messages: Message[]): GameState => {
-
-  const initialState: GameState = {
+  const state = {
     currentFloor: INITIAL_FLOOR,
-    movesLeft: TOTAL_MOVES,
-    currentPersona: 'elevator',
+    movesLeft: TOTAL_MOVES - messages.filter(m => m.persona === 'user').length,
+    currentPersona: 'elevator' as Persona, // Fix the type error by asserting type
     firstStageComplete: false,
     hasWon: false,
-    messages: [],
+    messages,
   };
 
-  return messages.reduce((state, message) => {
-    // Don't decrement moves for guide messages
-    if (message.persona === 'user') {
-      state = { ...state, movesLeft: state.movesLeft - 1 };
+  // Process actions in sequence
+  messages.forEach(msg => {
+    // Check for persona switch message
+    if (msg.persona === 'guide' && msg.message === 'Switching to Marvin mode...') {
+      state.currentPersona = 'marvin';
     }
 
-    // Add message to state
-    state.messages = [...state.messages, message];
-
-    // Process actions
-    switch (message.action) {
-      case 'none':
-        return state;
+    switch (msg.action) {
       case 'join':
-        return { ...state, hasWon: true };
+        state.hasWon = true;
+        break;
       case 'up':
-        return { ...state, currentFloor: Math.min(FLOORS, state.currentFloor + 1) };
+        state.currentFloor = Math.min(FLOORS, state.currentFloor + 1);
+        break;
       case 'down':
-        // Check if we're at floor 1 and set firstStageComplete
-        const newFloor = Math.max(1, state.currentFloor - 1);
-        if (newFloor === 1 && !state.firstStageComplete) {
-          return { 
-            ...state, 
-            currentFloor: newFloor,
-            firstStageComplete: true 
-          };
-        }
-        return { ...state, currentFloor: newFloor };
-      default:
-        return state;
+        state.currentFloor = Math.max(1, state.currentFloor - 1);
+        if (state.currentFloor === 1) state.firstStageComplete = true;
+        break;
     }
-  }, initialState);
+  });
+
+  return state;
 };
 
 
@@ -343,34 +333,27 @@ export default function HappyElevator() {
     message: string,
     gameState: GameState,
     dispatch: React.Dispatch<GameAction>
-  ): Promise<{
-    response: any | null;
-  }> => {
+  ): Promise<{ response: any | null }> => {
     const userMessage: Message = { 
       persona: 'user',
       message,
-      action: 'none'
+      action: 'none' as Action // Fix type error by asserting Action type
     };
 
     dispatch({ type: 'ADD_MESSAGE', message: userMessage });
 
     try {
-      const systemPrompt = {
-        role: 'system' as const,
-        content: getPersonaPrompt(gameState.currentPersona, gameState.currentFloor)
-      };
+      const messages = [
+        {
+          role: 'system',
+          content: getPersonaPrompt(gameState.currentPersona, gameState.currentFloor)
+        },
+        ...transformMessagesForLM([...gameState.messages, userMessage])
+      ];
 
-      const conversationMessages = transformMessagesForLM([
-        ...gameState.messages,
-        userMessage
-      ]);
-
-      const allMessages = [systemPrompt, ...conversationMessages];
-
-      const data = await fetchFromPollinations(allMessages);
+      const data = await fetchFromPollinations(messages);
       const response = JSON.parse(data.choices[0].message.content);
       
-      // Dispatch the response message immediately
       dispatch({ 
         type: 'ADD_MESSAGE', 
         message: {
@@ -405,7 +388,12 @@ const useGameState = (): [GameState, React.Dispatch<GameAction>] => {
         setMessages(prev => [...prev, action.message]);
         break;
       case 'SWITCH_PERSONA':
-        setMessages([]);
+        // Add a transition message instead of clearing
+        setMessages(prev => [...prev, {
+          persona: 'guide',
+          message: 'Switching to Marvin mode...',
+          action: 'none'
+        }]);
         break;
       case 'CHEAT_CODE':
         // Handle cheat code
@@ -487,7 +475,10 @@ const ElevatorAscii = ({
   let floors = Array(FLOORS).fill('   |  |   ');
   
   if (isMarvinMode) {
-    floors[elevatorPosition] = hasMarvinJoined ? '  [|MA|]  ' : 'MA[|##|]  ';
+    // Place Marvin on floor 1 (ground floor) when in Marvin mode
+    const marvinPosition = FLOORS - 1; // Ground floor
+    floors[elevatorPosition] = '  [|##|]  '; // Elevator
+    floors[marvinPosition] = hasMarvinJoined ? '  [|MA|]  ' : '  MA     '; // Marvin
   } else {
     floors[elevatorPosition] = '  [|##|]  ';
   }
@@ -496,9 +487,11 @@ const ElevatorAscii = ({
     floors = floors.map(_ => '                    |  |                    ');
     floors[0] = '                    |  |   <- Floor 5       ';
     floors[FLOORS - 1] = '                    |  |   <- Floor 1 (Goal)';
-    floors[elevatorPosition] = isMarvinMode
-      ? 'Marvin waiting -> MA[|##|]                    '
-      : '      Elevator ->  [|##|]                   ';
+    if (isMarvinMode) {
+      floors[FLOORS - 1] = 'Marvin ->   MA     |  |   <- Floor 1       ';
+    } else {
+      floors[elevatorPosition] = '      Elevator ->  [|##|]                   ';
+    }
   }
 
   return floors.join('\n');
@@ -579,42 +572,102 @@ type PollingsMessage = {
   content: string;
 }
 
-const fetchFromPollinations = async (messages: PollingsMessage[], jsonMode = true) => {
-  const response = await retryFetch(() => fetch('https://text.pollinations.ai/openai', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      messages,
-      model: 'openai',
-      jsonMode,
-      temperature: 1.2,
-      seed: Math.floor(Math.random() * 1000000)
-    }),
-  }));
+// Add this type for API response validation
+type PollingsResponse = {
+  choices: Array<{
+    message: {
+      content: string;
+    }
+  }>;
+}
 
-  if (!response.ok) throw new Error('API request failed');
-  return response.json();
+// Add a validation function
+const isValidResponse = (data: any): data is PollingsResponse => {
+  return Boolean(
+    data?.choices?.[0]?.message?.content &&
+    typeof data.choices[0].message.content === 'string'
+  );
+};
+
+const isValidJsonContent = (content: string): boolean => {
+  try {
+    const parsed = JSON.parse(content);
+    return Boolean(
+      typeof parsed.message === 'string' &&
+      ['none', 'join', 'up', 'down'].includes(parsed.action)
+    );
+  } catch {
+    return false;
+  }
+};
+
+// Replace the existing retryFetch with this enhanced version
+const retryFetch = async (
+  operation: () => Promise<Response>, 
+  validateJson = true,
+  maxAttempts = 3,
+  delayMs = 1000
+): Promise<PollingsResponse> => {
+  let attempts = 0;
+  let lastError: Error | null = null;
+  
+  while (attempts < maxAttempts) {
+    try {
+      const response = await operation();
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Validate response structure
+      if (!isValidResponse(data)) {
+        throw new Error('Invalid response structure');
+      }
+
+      // Optionally validate JSON content
+      if (validateJson && !isValidJsonContent(data.choices[0].message.content)) {
+        throw new Error('Invalid message content structure');
+      }
+
+      return data;
+    } catch (error) {
+      lastError = error as Error;
+      console.error(`Attempt ${attempts + 1} failed:`, error);
+      attempts++;
+      
+      if (attempts < maxAttempts) {
+        // Wait before retrying, with exponential backoff
+        await new Promise(resolve => setTimeout(resolve, delayMs * attempts));
+      }
+    }
+  }
+
+  throw new Error(`All ${maxAttempts} attempts failed. Last error: ${lastError?.message}`);
+};
+
+// Update fetchFromPollinations to use the enhanced retry logic
+const fetchFromPollinations = async (messages: PollingsMessage[], jsonMode = true) => {
+  const response = await retryFetch(
+    () => fetch('https://text.pollinations.ai/openai', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        messages,
+        model: 'openai',
+        jsonMode,
+        temperature: 1.2,
+        seed: Math.floor(Math.random() * 1000000)
+      }),
+    }),
+    jsonMode // Only validate JSON structure when jsonMode is true
+  );
+
+  return response;
 };
 
 // Add these functions before the HappyElevator component
-
-const retryFetch = async (operation: () => Promise<any>, maxAttempts = 3) => {
-    let attempts = 0;
-    
-    while (attempts < maxAttempts) {
-      try {
-        const result = await operation();
-        return result; // Success, return the result
-      } catch (error) {
-        console.error(`Attempt ${attempts + 1} failed:`, error);
-        attempts++;
-        if (attempts === maxAttempts) {
-          console.error('All attempts failed');
-          throw error; // Throw error after all attempts fail
-        }
-      }
-    }
-  };
 
 const isGuideMessage = (message: string) => {
   return message.startsWith('The Guide says:');
@@ -659,27 +712,38 @@ type MessageDisplayProps = {
 };
 
 const MessageDisplay: React.FC<MessageDisplayProps> = ({ msg, gameState }) => {
-  const getMessagePrefix = () => {
-    if (msg.persona === 'user') return '> ';
-    if (msg.persona === 'guide') return '';
-    return gameState.currentPersona === 'elevator' ? 'Elevator: ' : 'Marvin: ';
+  const messageStyles = {
+    user: 'text-yellow-400',
+    guide: 'text-blue-400',
+    elevator: 'text-green-400',
+    marvin: 'text-green-400'
   };
 
-  const getTextColorClass = () => {
-    if (msg.persona === 'user') return 'text-yellow-400';
-    if (msg.persona === 'guide') return 'text-blue-400';
-    return 'text-green-400';
+  const prefixes = {
+    user: '> ',
+    guide: '',
+    elevator: 'Elevator: ',
+    marvin: 'Marvin: '
   };
 
   return (
-    <div className={`p-2 ${getTextColorClass()}`}>
-      {getMessagePrefix()}
+    <div className={`p-2 ${messageStyles[msg.persona]}`}>
+      {prefixes[msg.persona]}
       {msg.message}
-      {msg.persona === 'elevator' && gameState.currentPersona === 'elevator' && 
-        getActionIndicator(msg.action)}
+      {msg.persona === 'elevator' && 
+       gameState.currentPersona === 'elevator' && 
+       getActionIndicator(msg.action)}
     </div>
   );
 };
+
+
+
+
+
+
+
+
 
 
 
