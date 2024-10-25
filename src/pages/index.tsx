@@ -92,7 +92,8 @@ const useInitialMessage = (
   const mounted = useRef(false);
 
   useEffect(() => {
-    if (mounted.current) { // Skip first render in dev mode
+    if (mounted.current && gameState.currentPersona === 'elevator') { 
+      // Only fetch initial message for elevator mode
       const initialMessage = async () => {
         const message = await fetchInitialMessage(gameState.currentPersona, gameState.currentFloor);
         dispatch({ type: 'ADD_MESSAGE', message });
@@ -378,7 +379,7 @@ const createLoggingDispatch = (dispatch: React.Dispatch<GameAction>) => {
   };
 };
 
-// Update useGameState to wrap the dispatch function
+// Update useGameState to handle the initial Marvin message
 const useGameState = (): [GameState, React.Dispatch<GameAction>] => {
   const [messages, setMessages] = useState<Message[]>([]);
 
@@ -388,12 +389,15 @@ const useGameState = (): [GameState, React.Dispatch<GameAction>] => {
         setMessages(prev => [...prev, action.message]);
         break;
       case 'SWITCH_PERSONA':
-        // Add a transition message instead of clearing
-        setMessages(prev => [...prev, {
-          persona: 'guide',
-          message: 'Switching to Marvin mode...',
-          action: 'none'
-        }]);
+        // Add both transition and initial Marvin messages at once
+        setMessages(prev => [
+          ...prev, 
+          {
+            persona: 'guide',
+            message: 'Switching to Marvin mode...',
+            action: 'none'
+          }
+        ]);
         break;
       case 'CHEAT_CODE':
         // Handle cheat code
@@ -401,9 +405,7 @@ const useGameState = (): [GameState, React.Dispatch<GameAction>] => {
     }
   };
   
-  // Wrap the dispatch function with logging
   const dispatchWithLogging = createLoggingDispatch(baseDispatch);
-  
   return [messagesToGameState(messages), dispatchWithLogging];
 };
 
@@ -795,6 +797,7 @@ const isValidJsonContent = (content: string): boolean => {
     return false;
   }
 };
+
 
 
 
