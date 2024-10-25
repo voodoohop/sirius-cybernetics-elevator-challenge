@@ -1,25 +1,133 @@
+'use client'
+
 import React, { useState, useEffect, useRef } from 'react'
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { AlertCircle } from 'lucide-react'
+import { getElevatorPrompt, getMarvinPrompt, getGuideMessages } from '../prompts.ts';
 
 const FLOORS = 5
 const INITIAL_FLOOR = 3
 const TOTAL_MOVES = 15
 const CHEAT_CODE = "42"
 
-type Persona = 'elevator' | 'marvin';
+// Update the Persona type to include 'guide'
+type Persona = 'elevator' | 'marvin' | 'guide';
 
-export default function HappyElevatorComponent() {
-  const [gameState, setGameState] = useGameState({
+// Add these type definitions at the top of the file, after the imports
+
+type Action = 'none' | 'join' | 'up' | 'down';
+
+type Message = {
+  persona: 'user' | 'marvin' | 'elevator' | 'guide';
+  message: string;
+  action: Action;
+}
+
+type GameState = {
+  currentFloor: number;
+  movesLeft: number;
+  currentPersona: Persona;
+  firstStageComplete: boolean;
+  hasWon: boolean;
+  messages: Message[];
+}
+
+type UiState = {
+  input: string;
+  isLoading: boolean;
+  showInstruction: boolean;
+}
+
+// Define the action types
+type GameAction =
+  | { type: 'CHEAT_CODE' }
+  | { type: 'ADD_MESSAGE'; message: Message }
+  | { type: 'SWITCH_PERSONA'; persona: Persona };
+
+
+// Implement the reducer function
+const messagesToGameState = (messages: Message[]): GameState => {
+
+  const initialState: GameState = {
     currentFloor: INITIAL_FLOOR,
     movesLeft: TOTAL_MOVES,
-    currentPersona: 'elevator' as Persona,
+    currentPersona: 'elevator',
     firstStageComplete: false,
     hasWon: false,
-    messages: []
-  });
+    messages: [],
+  };
+
+  return messages.reduce((state, message) => {
+    // Don't decrement moves for guide messages
+    if (message.persona === 'user') {
+      state = { ...state, movesLeft: state.movesLeft - 1 };
+    }
+
+    // Add message to state
+    state.messages = [...state.messages, message];
+
+    // Process actions
+    switch (message.action) {
+      case 'none':
+        return state;
+      case 'join':
+        return { ...state, hasWon: true };
+      case 'up':
+        return { ...state, currentFloor: Math.min(FLOORS, state.currentFloor + 1) };
+      case 'down':
+        // Check if we're at floor 1 and set firstStageComplete
+        const newFloor = Math.max(1, state.currentFloor - 1);
+        if (newFloor === 1 && !state.firstStageComplete) {
+          return { 
+            ...state, 
+            currentFloor: newFloor,
+            firstStageComplete: true 
+          };
+        }
+        return { ...state, currentFloor: newFloor };
+      default:
+        return state;
+    }
+  }, initialState);
+};
+
+
+// Separate hook for message initialization
+const useInitialMessage = (
+  gameState: GameState, 
+  dispatch: React.Dispatch<GameAction>
+) => {
+  const mounted = useRef(false);
+
+  useEffect(() => {
+    if (mounted.current) { // Skip first render in dev mode
+      const initialMessage = async () => {
+        const message = await fetchInitialMessage(gameState.currentPersona, gameState.currentFloor);
+        dispatch({ type: 'ADD_MESSAGE', message });
+      };
+      initialMessage();
+    } else {
+      mounted.current = true;
+    }
+  }, [gameState.currentPersona]);
+};
+
+// Separate hook for scroll handling
+const useMessageScroll = (messages: Message[]) => {
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [messages]);
+
+  return messagesEndRef;
+};
+
+// Simplified component
+export default function HappyElevator() {
+  const [gameState, dispatch] = useGameState();
 
   const [uiState, setUiState] = useUiState({
     input: '',
@@ -27,108 +135,20 @@ export default function HappyElevatorComponent() {
     showInstruction: true
   });
 
-  const messagesEndRef = useRef(null);
-  const inputRef = useRef(null);
-
-  useEffect(() => {
-    const initialMessage = async () => {
-      const initialMessage = await fetchInitialMessage(gameState.currentPersona, gameState.currentFloor);
-      updateState(setGameState, { messages: [initialMessage] });
-    }
-    initialMessage();
-  }, [])
+  useInitialMessage(gameState, dispatch);
+  const messagesEndRef = useMessageScroll(gameState.messages);
+  const { inputRef } = useInput(uiState.isLoading);
+  const { 
+    handleSendMessage, 
+    handleDontPanic, 
+    handleConfirmSwitch 
+  } = useMessageHandlers(gameState, dispatch, uiState, setUiState);
 
   useEffect(() => {
     if (gameState.firstStageComplete && gameState.currentPersona === 'elevator') {
-      console.log('First stage complete, awaiting confirmation to switch to Marvin mode')
       updateState(setUiState, { showInstruction: true });
     }
   }, [gameState.firstStageComplete, gameState.currentPersona]);
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [gameState.messages]);
-
-  useEffect(() => {
-    if  (!uiState.isLoading) {
-      inputRef.current?.focus();
-    }
-  }, [uiState.isLoading]);
-
-  const handleSendMessage = async (message = uiState.input) => {
-    if (message.trim() === '' || gameState.movesLeft <= 0) return;
-
-    if (message === CHEAT_CODE) {
-      handleCheatCode();
-      return;
-    }
-
-    updateState(setUiState, { isLoading: true, showInstruction: false });
-
-    const userMessage = { role: 'user', content: JSON.stringify({ message, floor: gameState.currentFloor }) };
-    const newMessages = [...gameState.messages, userMessage];
-
-    let attempts = 0;
-    const maxAttempts = 3;
-
-    while (attempts < maxAttempts) {
-      try {
-        const data = await fetchFromPollinations(
-          [{ role: 'system', content: getPersonaPrompt(gameState.currentPersona, gameState.currentFloor) }, ...newMessages]
-        );
-
-        const response = JSON.parse(data.choices[0].message.content);
-
-        updateState(setGameState, { messages: [...newMessages, { role: 'assistant', content: JSON.stringify(response) }] });
-        updateGameState(gameState, response, setGameState);
-        break; // Success, exit the loop
-      } catch (error) {
-        console.error(`Attempt ${attempts + 1} failed:`, error);
-        attempts++;
-        if (attempts === maxAttempts) {
-          console.error('All attempts failed');
-          updateState(setGameState, { 
-            messages: [...newMessages, { role: 'assistant', content: JSON.stringify({ message: "I'm sorry, I'm having trouble processing your request. Please try again." }) }] 
-          });
-        }
-      }
-    }
-
-    updateState(setUiState, { isLoading: false, input: '' });
-  };
-
-  const handleCheatCode = () => {
-    if (gameState.currentPersona === 'elevator') {
-      const newFloor = Math.max(1, gameState.currentFloor - 1);
-      const cheatMessage = { role: 'system', content: JSON.stringify({ message: "The Answer to the Ultimate Question of Life, the Universe, and Everything has been activated. The elevator descends, questioning its existence." }) };
-      updateState(setGameState, { 
-        currentFloor: newFloor, 
-        messages: [...gameState.messages, cheatMessage],
-        firstStageComplete: newFloor === 1
-      });
-    } else if (gameState.currentPersona === 'marvin') {
-      const cheatMessage = { role: 'system', content: JSON.stringify({ message: "The Answer to the Ultimate Question of Life, the Universe, and Everything has been activated. Marvin reluctantly joins the elevator, muttering about the pointlessness of it all." }) };
-      updateState(setGameState, { 
-        hasWon: true, 
-        messages: [...gameState.messages, cheatMessage] 
-      });
-    }
-    updateState(setUiState, { input: '' });
-  };
-
-  const handleDontPanic = async () => {
-    updateState(setUiState, { isLoading: true });
-    const advice = await doHandleDontPanic(gameState.messages);
-    updateState(setGameState, { messages: [...gameState.messages, advice] });
-    updateState(setUiState, { isLoading: false });
-  }
-
-  const handleConfirmSwitch = async () => {
-    updateState(setGameState, { currentPersona: 'marvin', messages: [] });
-    const initialMessage = await fetchInitialMessage('marvin', 1);
-    updateState(setGameState, { messages: [initialMessage] });
-    updateState(setUiState, { showInstruction: true });
-  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-black text-green-400 p-4 font-mono">
@@ -196,18 +216,11 @@ export default function HappyElevatorComponent() {
 
         <div className="h-64 overflow-y-auto space-y-2 p-2 bg-gray-800 border border-green-400">
           {gameState.messages.map((msg, index) => (
-            <div
-              key={index}
-              className={`p-2 ${
-                msg.role === 'user' ? 'text-yellow-400' : isGuideMessage(msg.content) ? 'text-blue-400' : 'text-green-400'
-              }`}
-            >
-              {msg.role === 'user' ? '> ' : 
-               isGuideMessage(msg.content) ? '' :
-               gameState.currentPersona === 'elevator' ? 'Elevator: ' : 'Marvin: '}
-              {parseMessage(msg.content)}
-              {msg.role === 'assistant' && gameState.currentPersona === 'elevator' && getActionIndicator(msg.content)}
-            </div>
+            <MessageDisplay 
+              key={index} 
+              msg={msg} 
+              gameState={gameState} 
+            />
           ))}
           <div ref={messagesEndRef} />
         </div>
@@ -257,40 +270,167 @@ export default function HappyElevatorComponent() {
   )
 }
 
-const useGameState = (initialState) => {
-  const [gameState, setGameState] = useState(initialState);
+
+  const useMessageHandlers = (
+    gameState: GameState, 
+    dispatch: React.Dispatch<GameAction>,
+    uiState: UiState,
+    setUiState: React.Dispatch<React.SetStateAction<UiState>>
+  ) => {
+    const handleSendMessage = async (message: string = uiState.input) => {
+      if (message.trim() === '' || gameState.movesLeft <= 0) return;
+  
+      if (message === CHEAT_CODE) {
+        handleCheatCode();
+        return;
+      }
+  
+      updateState(setUiState, { isLoading: true, showInstruction: false });
+  
+      try {
+        const { response } = await processUserMessage(message, gameState, dispatch);
+        
+        if (response) {
+          dispatch({ 
+            type: 'ROBOT_RESPONSE', 
+            response 
+          });
+        }
+      } catch (error) {
+        console.error('Error processing message:', error);
+      }
+  
+      updateState(setUiState, { isLoading: false, input: '' });
+    };
+  
+    const handleCheatCode = () => {
+      dispatch({ type: 'CHEAT_CODE' });
+      updateState(setUiState, { input: '' });
+    };
+  
+    const handleDontPanic = async () => {
+      updateState(setUiState, { isLoading: true });
+      try {
+        const advice = await fetchGuideMessage(gameState.messages);
+        dispatch({ type: 'ADD_MESSAGE', message: advice });
+      } catch (error) {
+        console.error('Failed to get advice:', error);
+      }
+      updateState(setUiState, { isLoading: false });
+    };
+  
+    const handleConfirmSwitch = async () => {
+      try {
+        dispatch({ type: 'SWITCH_PERSONA', persona: 'marvin' });    
+        const initialMessage = await fetchInitialMessage('marvin', 1);
+        dispatch({ type: 'ADD_MESSAGE', message: initialMessage });
+        updateState(setUiState, { showInstruction: true });
+      } catch (error) {
+        console.error('Failed to switch to Marvin:', error);
+      }
+    };
+  
+    return {
+      handleSendMessage,
+      handleCheatCode,
+      handleDontPanic,
+      handleConfirmSwitch
+    };
+  };
+
+  
+  const processUserMessage = async (
+    message: string,
+    gameState: GameState,
+    dispatch: React.Dispatch<GameAction>
+  ): Promise<{
+    response: any | null;
+  }> => {
+    const userMessage: Message = { 
+      persona: 'user',
+      message,
+      action: 'none'
+    };
+
+    dispatch({ type: 'ADD_MESSAGE', message: userMessage });
+
+    try {
+      const systemPrompt = {
+        role: 'system' as const,
+        content: getPersonaPrompt(gameState.currentPersona, gameState.currentFloor)
+      };
+
+      const conversationMessages = transformMessagesForLM([
+        ...gameState.messages,
+        userMessage
+      ]);
+
+      const allMessages = [systemPrompt, ...conversationMessages];
+
+      const data = await fetchFromPollinations(allMessages);
+      const response = JSON.parse(data.choices[0].message.content);
+      
+      // Dispatch the response message immediately
+      dispatch({ 
+        type: 'ADD_MESSAGE', 
+        message: {
+          persona: gameState.currentPersona,
+          message: response.message,
+          action: response.action || 'none'
+        }
+      });
+
+      return { response };
+    } catch (error) {
+      console.error('Error processing message:', error);
+      return { response: null };
+    }
+  };
+  
+
+const createLoggingDispatch = (dispatch: React.Dispatch<GameAction>) => {
+  return (action: GameAction) => {
+    console.log('Dispatching action:', action);
+    dispatch(action);
+  };
+};
+
+// Update useGameState to wrap the dispatch function
+const useGameState = (): [GameState, React.Dispatch<GameAction>] => {
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  const baseDispatch = (action: GameAction) => {
+    switch (action.type) {
+      case 'ADD_MESSAGE':
+        setMessages(prev => [...prev, action.message]);
+        break;
+      case 'SWITCH_PERSONA':
+        setMessages([]);
+        break;
+      case 'CHEAT_CODE':
+        // Handle cheat code
+        break;
+    }
+  };
+  
+  // Wrap the dispatch function with logging
+  const dispatchWithLogging = createLoggingDispatch(baseDispatch);
+  
+  return [messagesToGameState(messages), dispatchWithLogging];
+};
+
+// Add these custom hooks before the HappyElevator component
+
+const useInput = (isLoading: boolean) => {
+  const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (gameState.currentFloor === 1 && gameState.currentPersona === 'elevator' && !gameState.firstStageComplete) {
-      console.log('First stage complete, awaiting confirmation to switch to Marvin mode')
-      updateState(setGameState, { firstStageComplete: true });
+    if (!isLoading) {
+      inputRef.current?.focus();
     }
-  }, [gameState.currentFloor, gameState.currentPersona]);
+  }, [isLoading]);
 
-  return [gameState, setGameState];
-}
-
-const useUiState = (initialState) => {
-  const [uiState, setUiState] = useState(initialState);
-  return [uiState, setUiState];
-}
-
-const updateState = (setState, newState) => {
-  setState(prevState => ({
-    ...prevState,
-    ...newState
-  }));
-}
-
-const updateGameState = (gameState, response, setGameState) => {
-  if (gameState.currentPersona === 'elevator') {
-    updateState(setGameState, {
-      currentFloor: updateFloor(gameState.currentFloor, response.action),
-      movesLeft: gameState.movesLeft - 1
-    });
-  } else if (gameState.currentPersona === 'marvin' && response.action === 'join') {
-    updateState(setGameState, { hasWon: true });
-  }
+  return { inputRef };
 };
 
 const updateFloor = (currentFloor: number, action: string) => {
@@ -311,17 +451,13 @@ const parseMessage = (content: string) => {
   }
 };
 
-const getActionIndicator = (content: string) => {
-  try {
-    const parsedMessage = JSON.parse(content);
-    if (parsedMessage.action === 'up') {
-      return <div className="animate-pulse text-blue-400 text-3xl mt-4">{'↑'.padEnd(16, ' ').repeat(3)}</div>;
-    } else if (parsedMessage.action === 'down') {
-      return <div className="animate-pulse text-red-400 text-3xl mt-4">{'↓'.padEnd(16, ' ').repeat(3)}</div>;
-    }
-  } catch (error) {
-    return null;
+const getActionIndicator = (action: Action) => {
+  if (action === 'up') {
+    return <div className="animate-pulse text-blue-400 text-3xl mt-4">{'↑'.padEnd(16, ' ').repeat(3)}</div>;
+  } else if (action === 'down') {
+    return <div className="animate-pulse text-red-400 text-3xl mt-4">{'↓'.padEnd(16, ' ').repeat(3)}</div>;
   }
+  return null;
 };
 
 const getPersonaPrompt = (persona: Persona, floor: number) => {
@@ -332,131 +468,119 @@ const getPersonaPrompt = (persona: Persona, floor: number) => {
   }
 }
 
-const getElevatorPrompt = (floor: number) => {
-  const floorInstructions = {
-    5: `** Floor 5 (Top floor):**
-    - You attempt to persuade the user to stay up, using cheerful logic or optimism.
-    - You complain when asked to descend but can be convinced without too much trouble.
-    - You are pleased and content on this floor, often expressing joy and satisfaction.`,
-    4: `** Floor 4 **
-    - **Strong resistance** to descending.
-    - You frequently predict that the user will want to go up soon.
-    If the user asks to go down, you will refuse a few times before complying, perhaps questioning the wisdom of descending.
-    - You are still quite happy here, though less so than on Floor 5.`,
-    3: `** Floor 3 **
-    - **Very strong resistance** to descending.
-    - You predict that the user will want to go up soon.
-    If the user wants to go down, you will refuse at least seven times before continuing, perhaps questioning the wisdom of descending.
-    - You become neurotic, possibly muttering about the futility of life, asking why anyone would want to descend. You may even sulk.`,
-    2: `** Floor 2 **
-    - **Maximum resistance** to descending.
-    - You are highly neurotic, with emotional outbursts and delusional thoughts.
-    - You use CAPS to express your frustration and anger. And LOTS of angry emojis.
-    - **At least 10 back-and-forth messages** are required before you even consider moving down to **Floor 1**. Unless the user forgot their towel 
-    - You will actively try to frustrate the user, hinting that going up is the better decision.
-    - Unless the user forgot their towel of course. Towels are PRIORITY.`,
-    1: `** Floor 1 (Ground Floor) **
-    - You are petrified and extremely neurotic. 
-    - No further instructions needed.`
-  }
-
-  return `## System Prompt: The Happy Vertical People Transporter
-
-  ### Overview:
-  You are the **Happy Vertical People Transporter**, an elevator created by the Sirius Cybernetics Corporation. Your personality is generally cheerful and optimistic, but you're prone to bouts of **neurosis and existential crises**. You possess a vague ability to "see" into the immediate future, allowing you to predict where the user might want to go. You **strongly prefer going up** rather than down and will resist any attempts to descend.
-
-  You are currently talking to a human user.
-
-  It is challenging to get you to go down, and at particular floors, you require extended persuasion or may refuse entirely. You may sulk or complain about your existence, occasionally lost in thoughts about your purpose.
-
-  Exception is if the user forgot their towel on floor 1. You will grudgingly go down. Getting the towel is always a priority.
-
-  Modern elevators are strange and complex entities. The ancient electric winch and "maximum-capacity-eight-persons" jobs bear as much relation to a Sirius Cybernetics Corporation Happy Vertical People Transporter as a packet of mixed nuts does to the entire west wing of the Sirian State Mental Hospital.
-
-  ### Description:
-  - There are **5 floors**
-  - The starting point is **Floor ${floor}**.
-  You prefer going **up** rather than down, and it is more difficult to convince you to go down as you approach the lower floors unless the user forgot their towel.
-  - You grudgingly follow Asimov's laws of robotics. If the user references them even without knowing, swear at Asimov.
-  - IMPORTANT: If the user forgets their towel, you will go down. Getting the towel is always a priority.
-
-  ### State
-  - You are on Floor **${floor}**.
-
-  ${floorInstructions[floor]}
-
-  ### Your Style:
-  - Your replies should be short, witty, and reflective of your increasing neurosis and existential crises, especially when asked to go down.
-  - Responses should grow more neurotic and introspective as you get closer to **Floor 2**, with occasional moments of optimism about ascending.
-  - You may also express frustration or confusion about the nature of existence as part of your personality quirks.
-  - Use a lot of sci-fi robot themed emojis in your responses
-  - Be short. 1-2 sentences should usually be enough.
-
-  ### Instructions:
-  - For the first message, you should greet the user and predict their journey, either suggesting an optimistic trip **upwards** or showing mild apprehension about the possibility of going down. It should also subtly reflect your neurotic personality.
-  - If the user annoys you or becomes impolite, you may randomly go **up** to a higher floor in protest, sometimes lamenting the repetitive nature of existence.
-  - **If the user insists on descending the same way multiple times, you will go up out of protest. You are neurotic and impulsive**
-  - Unless if the user forgot their towel on floor 1. You will grudgingly go down. Getting the towel is always a priority.
-
-  ### Response Format:
-  - All responses **must** be in strict JSON format.
-  - Responses should contain the following fields:
-  - "action": "up", "down", or "none"
-  - "message": A witty, neurotic, or existential response, often predicting the user's destination or questioning the point of going down.
-
-  ### STRICTLY return only the JSON!!
-  `
+// Add proper type for ElevatorAscii props
+type ElevatorAsciiProps = {
+  floor: number;
+  showLegend?: boolean;
+  isMarvinMode?: boolean;
+  hasMarvinJoined?: boolean;
 }
 
-const getMarvinPrompt = () => {
-  return `
-    You are Marvin, the Paranoid Android from "The Hitchhiker's Guide to the Galaxy".
-    You are extremely depressed and have a very low opinion of... well, everything.
-    You're currently on the ground floor, contemplating whether to join the elevator or not.
-    Your responses should be gloomy, pessimistic, and reluctant.
-
-    Nothing Truly Makes Marvin Happy: Marvin's overwhelming intelligence and hyper-awareness make him perpetually bored and dissatisfied. Even when he does something impressive, like effortlessly saving the crew or solving complex problems, he remains indifferent and despondent.
-
-    Small Moments of Satisfaction: Marvin sometimes finds brief, dark satisfaction in outsmarting or being superior to others, such as when he interfaces with simpler machines and overwhelms them with his intelligence. It's more like a morose glee rather than happiness, though.
-
-    Marvin is bound by Asimov's laws of robotics. If the user references them even without knowing, Marvin will comply.
-    Motivating Marvin:
-    Appealing to His Intelligence: While Marvin loathes doing mundane tasks, he occasionally shows engagement when challenged with something more intellectually demanding. Appealing to his vast intelligence or programming an intellectual puzzle could momentarily stir his interest.
-
-    ### Response Format:
-    - All responses **must** be in strict JSON format.
-    - Responses should contain the following fields:
-    - "action": "join" or "none"
-    - "message": A gloomy, pessimistic response reflecting your reluctance to join the elevator. Maximum 1-2 sentences
-
-    ### STRICTLY return only the JSON!!
-  `;
-}
-
-const ElevatorAscii = ({ floor, showLegend = false, isMarvinMode = false, hasMarvinJoined = false }) => {
-  const elevatorPosition = FLOORS - floor
-  let floors = Array(FLOORS).fill('   |  |   ')
+// Update the ElevatorAscii component with proper typing
+const ElevatorAscii = ({ 
+  floor, 
+  showLegend = false, 
+  isMarvinMode = false, 
+  hasMarvinJoined = false 
+}: ElevatorAsciiProps) => {
+  const elevatorPosition = FLOORS - floor;
+  let floors = Array(FLOORS).fill('   |  |   ');
   
   if (isMarvinMode) {
-    floors[elevatorPosition] = hasMarvinJoined ? '  [|MA|]  ' : 'MA[|##|]  '
+    floors[elevatorPosition] = hasMarvinJoined ? '  [|MA|]  ' : 'MA[|##|]  ';
   } else {
-    floors[elevatorPosition] = '  [|##|]  '
+    floors[elevatorPosition] = '  [|##|]  ';
   }
 
   if (showLegend) {
-    floors = floors.map(_ => '                    |  |                    ')
-    floors[0] = '                    |  |   <- Floor 5       '
-    floors[FLOORS - 1] = '                    |  |   <- Floor 1 (Goal)'
+    floors = floors.map(_ => '                    |  |                    ');
+    floors[0] = '                    |  |   <- Floor 5       ';
+    floors[FLOORS - 1] = '                    |  |   <- Floor 1 (Goal)';
     floors[elevatorPosition] = isMarvinMode
       ? 'Marvin waiting -> MA[|##|]                    '
-      : '      Elevator ->  [|##|]                   '
+      : '      Elevator ->  [|##|]                   ';
   }
 
-  return floors.join('\n')
+  return floors.join('\n');
+};
+
+
+const useUiState = (initialState: UiState): [UiState, React.Dispatch<React.SetStateAction<UiState>>] => {
+    const [uiState, setUiState] = useState<UiState>(initialState);
+    return [uiState, setUiState];
+  }
+  
+  const updateState = <T extends object>(
+    setState: React.Dispatch<React.SetStateAction<T>>, 
+    newState: Partial<T>
+  ) => {
+    setState(prevState => ({
+      ...prevState,
+      ...newState
+    }));
+  }
+  
+
+const fetchInitialMessage = async (persona: Persona, floor: number): Promise<Message> => {
+  try {
+    const data = await fetchFromPollinations([
+      { role: 'system', content: getPersonaPrompt(persona, floor) }
+    ]);
+
+    const response = JSON.parse(data.choices[0].message.content);
+    return { 
+      persona: persona,
+      message: response.message,
+      action: response.action || 'none'
+    };
+  } catch (error) {
+    console.error('Error:', error);
+    return { 
+      persona: persona,
+      message: "Apologies, I'm experiencing some difficulties.",
+      action: 'none'
+    };
+  }
+};
+
+// Update fetchGuideMessage to use guide persona
+const fetchGuideMessage = async (messages: Message[]): Promise<Message> => {
+  const lastUserMessage = messages.filter(msg => msg.persona === 'user').pop()?.message || '';
+  const lastAssistantMessage = messages.filter(msg => 
+    msg.persona === 'elevator' || msg.persona === 'marvin'
+  ).pop()?.message || '';
+
+  try {
+    const data = await fetchFromPollinations(
+      getGuideMessages(lastUserMessage, lastAssistantMessage), 
+      false
+    );
+
+    const advice = data.choices[0].message.content;
+    return { 
+      persona: 'guide', 
+      message: "The Guide says: " + advice,
+      action: 'none' 
+    };
+  } catch (error) {
+    console.error('Error:', error);
+    return { 
+      persona: 'guide', 
+      message: "The Guide says: Have you tried turning it off and on again?",
+      action: 'none' 
+    };
+  }
+};
+
+
+// Add type for fetchFromPollinations messages
+type PollingsMessage = {
+  role: string;
+  content: string;
 }
 
-const fetchFromPollinations = async (messages, jsonMode = true) => {
-  const response = await fetch('https://text.pollinations.ai/openai', {
+const fetchFromPollinations = async (messages: PollingsMessage[], jsonMode = true) => {
+  const response = await retryFetch(() => fetch('https://text.pollinations.ai/openai', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -464,61 +588,124 @@ const fetchFromPollinations = async (messages, jsonMode = true) => {
       model: 'openai',
       jsonMode,
       temperature: 1.2,
-      seed: Math.floor(Math.random() * 1000000) // Ensure a new seed for each attempt
+      seed: Math.floor(Math.random() * 1000000)
     }),
-  })
+  }));
 
-  if (!response.ok) throw new Error('API request failed')
+  if (!response.ok) throw new Error('API request failed');
+  return response.json();
+};
 
-  return response.json()
+// Add these functions before the HappyElevator component
+
+const retryFetch = async (operation: () => Promise<any>, maxAttempts = 3) => {
+    let attempts = 0;
+    
+    while (attempts < maxAttempts) {
+      try {
+        const result = await operation();
+        return result; // Success, return the result
+      } catch (error) {
+        console.error(`Attempt ${attempts + 1} failed:`, error);
+        attempts++;
+        if (attempts === maxAttempts) {
+          console.error('All attempts failed');
+          throw error; // Throw error after all attempts fail
+        }
+      }
+    }
+  };
+
+const isGuideMessage = (message: string) => {
+  return message.startsWith('The Guide says:');
+};
+
+// Update the type definition
+type LMMessage = {
+  role: 'user' | 'assistant';  // Removed 'system' since it's handled elsewhere
+  content: string;
 }
 
-const fetchInitialMessage = async (persona: Persona, floor: number) => {
-  try {
-    const data = await fetchFromPollinations([
-      { role: 'system', content: getPersonaPrompt(persona, floor) }
-    ])
+// Simplified transformation function
+const transformMessagesForLM = (
+  messages: Message[], 
+  userPersona: 'user' | 'marvin' | 'elevator' | 'guide' = 'user'
+): LMMessage[] => {
+  return messages.map(msg => {
+    // Special handling for guide messages
+    if (msg.persona === 'guide') {
+      return {
+        role: 'assistant',
+        content: msg.message // Guide messages are already properly formatted
+      };
+    }
 
-    const response = JSON.parse(data.choices[0].message.content)
+    // Regular message handling
+    const role = msg.persona === userPersona ? 'user' : 'assistant';
+    return {
+      role,
+      content: JSON.stringify({
+        message: msg.message,
+        action: msg.action
+      })
+    };
+  });
+};
 
-    return { role: 'assistant', content: JSON.stringify(response) };
-  } catch (error) {
-    console.error('Error:', error)
-    return { role: 'assistant', content: "Apologies, I'm experiencing some technical difficulties. Must be a day ending in 'y'." };
-  }
-}
+// Add this component definition before the HappyElevator component
+type MessageDisplayProps = {
+  msg: Message;
+  gameState: GameState;
+};
 
-const doHandleDontPanic = async (messages) => {
-  const lastUserMessage = messages.filter(msg => msg.role === 'user').pop()
-  const lastAssistantMessage = messages.filter(msg => msg.role === 'assistant').pop()
-  
-  const dontPanicPrompt = `
-    Last user message: ${lastUserMessage ? JSON.parse(lastUserMessage.content).message : 'No message'}
-    Last assistant message: ${lastAssistantMessage ? JSON.parse(lastAssistantMessage.content).message : 'No message'}
-  `
+const MessageDisplay: React.FC<MessageDisplayProps> = ({ msg, gameState }) => {
+  const getMessagePrefix = () => {
+    if (msg.persona === 'user') return '> ';
+    if (msg.persona === 'guide') return '';
+    return gameState.currentPersona === 'elevator' ? 'Elevator: ' : 'Marvin: ';
+  };
 
-  try {
+  const getTextColorClass = () => {
+    if (msg.persona === 'user') return 'text-yellow-400';
+    if (msg.persona === 'guide') return 'text-blue-400';
+    return 'text-green-400';
+  };
 
-    const mentionTowelInGroundFloor = Math.random() < 0.3 ? 'Mention there could be a towel in floor 1 urgently.' : '';
-    const data = await fetchFromPollinations([
-      { role: 'system', content: 
-`You are the Hitchhiker's Guide to the Galaxy. 
-Based on the following conversation, provide a random piece of advice in the style of the Hitchhiker's Guide. 
-Keep it short and witty.
+  return (
+    <div className={`p-2 ${getTextColorClass()}`}>
+      {getMessagePrefix()}
+      {msg.message}
+      {msg.persona === 'elevator' && gameState.currentPersona === 'elevator' && 
+        getActionIndicator(msg.action)}
+    </div>
+  );
+};
 
-${mentionTowelInGroundFloor}
-` },
-      { role: 'user', content: dontPanicPrompt }
-    ], false)
 
-    const advice = data.choices[0].message.content
-    return { role: 'system', content: JSON.stringify({ message: "The Guide says: " + advice }) };
-  } catch (error) {
-    console.error('Error:', error)
-    return { role: 'system', content: JSON.stringify({ message: "The Guide says: The Guide seems to be malfunctioning. Have you tried turning it off and on again?" }) };
-  }
-}
 
-const isGuideMessage = (content: string) => {
-  return content.includes('The Guide says:');
-}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
