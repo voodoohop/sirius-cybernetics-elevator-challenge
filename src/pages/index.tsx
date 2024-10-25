@@ -471,12 +471,13 @@ const ElevatorAscii = ({
   isMarvinMode = false, 
   hasMarvinJoined = false 
 }: ElevatorAsciiProps) => {
-  const elevatorPosition = FLOORS - floor;
+  // Now floor number directly corresponds to array index (floor 1 = index 0)
+  const elevatorPosition = floor - 1;
   let floors = Array(FLOORS).fill('   |  |   ');
   
   if (isMarvinMode) {
-    // Place Marvin on floor 1 (ground floor) when in Marvin mode
-    const marvinPosition = FLOORS - 1; // Ground floor
+    // Place Marvin on floor 1 (ground floor)
+    const marvinPosition = 0; // Ground floor (floor 1) is at index 0
     floors[elevatorPosition] = '  [|##|]  '; // Elevator
     floors[marvinPosition] = hasMarvinJoined ? '  [|MA|]  ' : '  MA     '; // Marvin
   } else {
@@ -484,17 +485,18 @@ const ElevatorAscii = ({
   }
 
   if (showLegend) {
-    floors = floors.map(_ => '                    |  |                    ');
-    floors[0] = '                    |  |   <- Floor 5       ';
-    floors[FLOORS - 1] = '                    |  |   <- Floor 1 (Goal)';
+    floors = floors.map(_ => '                   |  |                   ');
+    floors[FLOORS - 1] = '                   |  |  <- Floor 5       ';
+    floors[0] = '                   |  |  <- Floor 1 (Goal)';
     if (isMarvinMode) {
-      floors[FLOORS - 1] = 'Marvin ->   MA     |  |   <- Floor 1       ';
+      floors[0] = '     Marvin -> MA  |  |  <- Floor 1       ';
     } else {
-      floors[elevatorPosition] = '      Elevator ->  [|##|]                   ';
+      floors[elevatorPosition] = '      Elevator -> [|##|]                  ';
     }
   }
 
-  return floors.join('\n');
+  // Reverse the array so floor 5 appears at the top
+  return floors.reverse().join('\n');
 };
 
 
@@ -589,19 +591,15 @@ const isValidResponse = (data: any): data is PollingsResponse => {
   );
 };
 
-const isValidJsonContent = (content: string): boolean => {
-  try {
-    const parsed = JSON.parse(content);
-    return Boolean(
-      typeof parsed.message === 'string' &&
-      ['none', 'join', 'up', 'down'].includes(parsed.action)
-    );
-  } catch {
-    return false;
+// Add a custom error class for retry attempts
+class RetryableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RetryableError';
   }
-};
+}
 
-// Replace the existing retryFetch with this enhanced version
+// Update retryFetch with better error handling
 const retryFetch = async (
   operation: () => Promise<Response>, 
   validateJson = true,
@@ -616,55 +614,91 @@ const retryFetch = async (
       const response = await operation();
       
       if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+        console.warn(`Attempt ${attempts + 1}: HTTP error ${response.status}`);
+        attempts++;
+        continue;
       }
       
       const data = await response.json();
       
       // Validate response structure
       if (!isValidResponse(data)) {
-        throw new Error('Invalid response structure');
+        console.warn(`Attempt ${attempts + 1}: Invalid response structure`);
+        attempts++;
+        continue;
       }
 
       // Optionally validate JSON content
-      if (validateJson && !isValidJsonContent(data.choices[0].message.content)) {
-        throw new Error('Invalid message content structure');
+      if (validateJson) {
+        const content = data.choices[0].message.content;
+        if (!isValidJsonContent(content)) {
+          console.warn(`Attempt ${attempts + 1}: Invalid JSON content`);
+          attempts++;
+          continue;
+        }
       }
 
       return data;
     } catch (error) {
       lastError = error as Error;
-      console.error(`Attempt ${attempts + 1} failed:`, error);
+      console.warn(`Attempt ${attempts + 1} failed:`, error);
       attempts++;
-      
-      if (attempts < maxAttempts) {
-        // Wait before retrying, with exponential backoff
-        await new Promise(resolve => setTimeout(resolve, delayMs * attempts));
-      }
+    }
+    
+    if (attempts < maxAttempts) {
+      const delay = delayMs * Math.pow(2, attempts - 1);
+      console.log(`Waiting ${delay}ms before retry...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
     }
   }
 
-  throw new Error(`All ${maxAttempts} attempts failed. Last error: ${lastError?.message}`);
+  // If all attempts failed, return a fallback response instead of throwing
+  console.error(`All ${maxAttempts} attempts failed. Last error: ${lastError?.message}`);
+  return {
+    choices: [{
+      message: {
+        content: JSON.stringify({
+          message: "I apologize, but I'm having trouble processing your request right now.",
+          action: "none"
+        })
+      }
+    }]
+  };
 };
 
-// Update fetchFromPollinations to use the enhanced retry logic
+// Update fetchFromPollinations to handle errors gracefully
 const fetchFromPollinations = async (messages: PollingsMessage[], jsonMode = true) => {
-  const response = await retryFetch(
-    () => fetch('https://text.pollinations.ai/openai', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        messages,
-        model: 'openai',
-        jsonMode,
-        temperature: 1.2,
-        seed: Math.floor(Math.random() * 1000000)
+  try {
+    return await retryFetch(
+      () => fetch('https://text.pollinations.ai/openai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          messages,
+          model: 'openai',
+          jsonMode,
+          temperature: 1.2,
+          seed: Math.floor(Math.random() * 1000000)
+        }),
       }),
-    }),
-    jsonMode // Only validate JSON structure when jsonMode is true
-  );
-
-  return response;
+      jsonMode
+    );
+  } catch (error) {
+    console.error('Error in fetchFromPollinations:', error);
+    // Return a fallback response
+    return {
+      choices: [{
+        message: {
+          content: jsonMode 
+            ? JSON.stringify({
+                message: "I apologize, but I'm having trouble processing your request right now.",
+                action: "none"
+              })
+            : "I apologize, but I'm having trouble processing your request right now."
+        }
+      }]
+    };
+  }
 };
 
 // Add these functions before the HappyElevator component
@@ -736,6 +770,34 @@ const MessageDisplay: React.FC<MessageDisplayProps> = ({ msg, gameState }) => {
     </div>
   );
 };
+
+// Update isValidJsonContent to be more specific about validation failures
+const isValidJsonContent = (content: string): boolean => {
+  try {
+    const parsed = JSON.parse(content);
+    
+    const hasValidMessage = typeof parsed.message === 'string' && parsed.message.length > 0;
+    const hasValidAction = ['none', 'join', 'up', 'down'].includes(parsed.action);
+    
+    if (!hasValidMessage) {
+      console.error('Invalid message format:', parsed);
+      return false;
+    }
+    
+    if (!hasValidAction) {
+      console.error('Invalid action:', parsed.action);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('JSON parse error:', error);
+    return false;
+  }
+};
+
+
+
 
 
 
