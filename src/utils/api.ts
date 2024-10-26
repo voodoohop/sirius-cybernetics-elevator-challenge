@@ -31,7 +31,6 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export const retryFetch = async (
   operation: () => Promise<Response>,
-  jsonMode = true,
   maxAttempts = API_CONFIG.MAX_RETRIES
 ): Promise<PollingsResponse> => {
   let lastError: Error | null = null;
@@ -64,7 +63,6 @@ export const fetchFromPollinations = async (
   try {
     return await retryFetch(
       () => fetch(API_CONFIG.ENDPOINT, createFetchRequest(messages, jsonMode)),
-      jsonMode
     );
   } catch (error) {
     console.error('Error in fetchFromPollinations:', error);
