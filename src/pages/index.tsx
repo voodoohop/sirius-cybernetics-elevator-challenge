@@ -96,7 +96,8 @@ export default function Index() {
         {uiState.showInstruction && gameState.currentPersona === 'marvin' && (
           <div className="bg-pink-900/50 text-pink-200 p-4 rounded-lg flex items-center space-x-2">
             <AlertCircle className="w-5 h-5" />
-            <p>New challenge: Convince Marvin the Paranoid Android to join you in the elevator!</p>
+            <p>New challenge: First convince Marvin the Paranoid Android to join you in the elevator, then together reach the top floor! 
+            Warning: Marvin's pessimism might affect the elevator's behavior...</p>
           </div>
         )}
 
@@ -125,7 +126,8 @@ export default function Index() {
         {gameState.hasWon && (
           <div className="bg-green-900 text-green-200 p-4 rounded-lg text-center animate-bounce">
             <p className="text-xl font-bold">So Long, and Thanks for All the Fish!</p>
-            <p>You've successfully convinced Marvin to join you in the elevator. Time for a Pan Galactic Gargle Blaster?</p>
+            <p>You've successfully convinced Marvin to join you and reached the top floor together. 
+            Even if Marvin thinks it was all pointless, you've done a remarkable job! Time for a Pan Galactic Gargle Blaster?</p>
           </div>
         )}
 
