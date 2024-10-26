@@ -1,3 +1,5 @@
+import { Persona } from '@/types';
+
 type Persona = 'elevator' | 'marvin';
 
 export const getElevatorPrompt = (floor: number) => {
@@ -101,26 +103,25 @@ export const getMarvinPrompt = () => {
   `;
 }
 
-export const getGuideMessages = (lastUserMessage: string, lastAssistantMessage: string) => {
+export const getGuideMessages = () => {
   const mentionTowelInGroundFloor = Math.random() < 0.3 ? 'Mention there could be a towel in floor 1 urgently.' : '';
   
-  return [
-    { 
-      role: 'system', 
-      content: `
-        You are the Hitchhiker's Guide to the Galaxy. 
-        Based on the following conversation, provide a random piece of advice in the style of the Hitchhiker's Guide. 
-        Keep it short and witty.
-
-        ${mentionTowelInGroundFloor}
-      `
-    },
-    { 
-      role: 'user', 
-      content: `
-        Last user message: ${lastUserMessage ? lastUserMessage : 'No message'}
-        Last assistant message: ${lastAssistantMessage ? lastAssistantMessage : 'No message'}
-      `
-    }
-  ];
+  return `You are the Hitchhiker's Guide to the Galaxy. 
+    Provide a random piece of advice in the style of the Hitchhiker's Guide. 
+    Keep it short and witty.
+    ${mentionTowelInGroundFloor}
+  `;
 }
+
+export const getPersonaPrompt = (persona: Persona, floor: number) => {
+  switch (persona) {
+    case 'elevator':
+      return getElevatorPrompt(floor);
+    case 'marvin':
+      return getMarvinPrompt();
+    case 'guide':
+      return getGuideMessages();
+    default:
+      throw new Error(`Unknown persona: ${persona}`);
+  }
+};
