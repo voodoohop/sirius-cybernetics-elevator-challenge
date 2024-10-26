@@ -62,9 +62,14 @@ export default function Index() {
         </div>
         
         {uiState.showInstruction && gameState.currentPersona === 'elevator' && !gameState.firstStageComplete && (
-          <div className="bg-blue-900 text-blue-200 p-4 rounded-lg flex items-center space-x-2">
-            <AlertCircle className="w-5 h-5" />
-            <p>Psst! Your mission: Convince this neurotic elevator to reach the ground floor. Remember your towel!</p>
+          <div className="space-y-2">
+            <div className="bg-blue-900 text-blue-200 p-4 rounded-lg flex items-center space-x-2">
+              <AlertCircle className="w-5 h-5" />
+              <p>Psst! Your mission: Convince this neurotic elevator to reach the ground floor. Remember your towel!</p>
+            </div>
+            <div className="bg-yellow-900/50 text-yellow-200 p-3 rounded-lg text-sm">
+              <p><strong>Sub-etha News Flash:</strong> New Genuine People Personalities™ scenarios detected in building mainframe. Prepare for Marvin!</p>
+            </div>
           </div>
         )}
         {uiState.showInstruction && gameState.currentPersona === 'elevator' && gameState.firstStageComplete && (
