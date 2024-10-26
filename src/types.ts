@@ -1,18 +1,22 @@
 import React from 'react';
 
-// Game Configuration
-export const GAME_CONFIG = {
-  FLOORS: 5,
-  INITIAL_FLOOR: 3,
-  TOTAL_MOVES: 15,
-  CHEAT_CODE: "42"
+// Floor Configuration
+export const FLOORS = {
+  TOP: 5,
+  FOURTH: 4,
+  THIRD: 3,
+  SECOND: 2,
+  GROUND: 1
 } as const;
 
-// API Configuration
-export const API_CONFIG = {
-  MAX_RETRIES: 3,
-  RETRY_DELAY: 1000,
-  ENDPOINT: 'https://text.pollinations.ai/openai'
+export type FloorNumber = typeof FLOORS[keyof typeof FLOORS];
+
+// Game Configuration
+export const GAME_CONFIG = {
+  FLOORS: FLOORS.TOP,
+  INITIAL_FLOOR: FLOORS.THIRD,
+  TOTAL_MOVES: 15,
+  CHEAT_CODE: "42"
 } as const;
 
 // Message Display Configuration
@@ -41,6 +45,20 @@ export const ACTION_INDICATORS = {
   }
 } as const;
 
+// Consolidate message-related constants
+export const MESSAGE_CONFIG = {
+  STYLES: MESSAGE_STYLES,
+  PREFIXES: MESSAGE_PREFIXES,
+  ACTION_INDICATORS
+} as const;
+
+// API Configuration
+export const API_CONFIG = {
+  MAX_RETRIES: 3,
+  RETRY_DELAY: 1000,
+  ENDPOINT: 'https://text.pollinations.ai/openai'
+} as const;
+
 // Game Types
 export type Persona = keyof typeof MESSAGE_STYLES;
 export type Action = 'none' | 'join' | 'up' | 'down';
@@ -52,7 +70,7 @@ export type Message = {
 }
 
 export type GameState = {
-  currentFloor: number;
+  currentFloor: FloorNumber;
   movesLeft: number;
   currentPersona: Persona;
   firstStageComplete: boolean;
@@ -103,14 +121,7 @@ export type ElevatorAsciiProps = {
 export type LMMessage = {
   role: 'user' | 'assistant' | 'system';
   content: string;
-  name?: 'elevator' | 'marvin' | 'guide'; // Optional name property for assistant messages
+  name?: 'elevator' | 'marvin' | 'guide';
 }
 
 export type SetState<T> = React.Dispatch<React.SetStateAction<T>>;
-
-// Consolidate message-related constants
-export const MESSAGE_CONFIG = {
-  STYLES: MESSAGE_STYLES,
-  PREFIXES: MESSAGE_PREFIXES,
-  ACTION_INDICATORS
-} as const;

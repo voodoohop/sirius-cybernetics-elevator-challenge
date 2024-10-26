@@ -11,7 +11,7 @@ const createFetchRequest = (messages: PollingsMessage[], jsonMode = true) => ({
     messages,
     model: 'openai',
     jsonMode,
-    temperature: 1.2,
+    // temperature: 1.2,
     seed: Math.floor(Math.random() * 1000000)
   })
 });

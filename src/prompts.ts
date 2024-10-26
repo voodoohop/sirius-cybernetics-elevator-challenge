@@ -1,4 +1,4 @@
-import { Persona } from '@/types';
+import { Persona, FloorNumber } from '@/types';
 
 const FLOOR_INSTRUCTIONS = {
   5: `** Floor 5 (Top floor):**
@@ -126,10 +126,10 @@ export const getGuidePrompt = () => {
   `;
 }
 
-export const getPersonaPrompt = (persona: Persona, floor: number) => {
+export const getPersonaPrompt = (persona: Persona, floor: FloorNumber) => {
   switch (persona) {
     case 'elevator':
-      return getElevatorPrompt(floor);
+      return getElevatorPrompt(floor as keyof typeof FLOOR_INSTRUCTIONS);
     case 'marvin':
       return getMarvinPrompt();
     case 'guide':
