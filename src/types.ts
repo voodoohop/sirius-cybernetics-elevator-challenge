@@ -13,12 +13,12 @@ export const MESSAGE_STYLES = {
   user: 'text-yellow-400',
   guide: 'text-blue-400',
   elevator: 'text-green-400',
-  marvin: 'text-red-400'  // Updated to a lighter fuchsia color
+  marvin: 'text-yellow-200'  // Updated to a lighter fuchsia color
 } as const;
 
 export const MESSAGE_PREFIXES = {
   user: '> ',
-  guide: '',
+  guide: 'The Guide Says: ',
   elevator: 'Elevator: ',
   marvin: 'Marvin: '
 } as const;
