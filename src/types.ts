@@ -67,6 +67,7 @@ export type GameState = {
   messages: Message[];
   conversationMode: 'user-interactive' | 'autonomous';
   lastSpeaker: 'marvin' | 'elevator' | null;
+  marvinJoined: boolean;  // New property to track if Marvin is in the elevator
 }
 
 export type UiState = {

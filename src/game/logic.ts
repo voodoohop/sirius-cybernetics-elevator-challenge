@@ -16,14 +16,12 @@ export const messagesToGameState = (messages: Message[]): GameState => {
     currentFloor: GAME_CONFIG.INITIAL_FLOOR,
     movesLeft: GAME_CONFIG.TOTAL_MOVES - messages.filter(m => m.persona === 'user').length,
     currentPersona: 'elevator',
-    // currentPersona: 'marvin',
     firstStageComplete: false,
-    // firstStageComplete: true,
     hasWon: false,
     messages,
     conversationMode: 'user-interactive',
-    // conversationMode: 'autonomous',
-    lastSpeaker: null
+    lastSpeaker: null,
+    marvinJoined: false
   };
 
   messages.forEach(msg => {
@@ -35,9 +33,14 @@ export const messagesToGameState = (messages: Message[]): GameState => {
       case 'join':
         state.conversationMode = 'autonomous';
         state.lastSpeaker = 'marvin';
+        state.marvinJoined = true;  // Set marvinJoined instead of hasWon
         break;
       case 'up':
         state.currentFloor = Math.min(GAME_CONFIG.FLOORS, state.currentFloor + 1);
+        // Set hasWon when they reach the top floor together
+        if (state.marvinJoined && state.currentFloor === GAME_CONFIG.FLOORS) {
+          state.hasWon = true;
+        }
         break;
       case 'down':
         state.currentFloor = Math.max(1, state.currentFloor - 1);

@@ -101,7 +101,7 @@ export default function Index() {
               floor: gameState.currentFloor,
               showLegend: uiState.showInstruction,
               isMarvinMode: gameState.currentPersona === 'marvin',
-              hasMarvinJoined: gameState.hasWon
+              hasMarvinJoined: gameState.marvinJoined  // Use marvinJoined instead of hasWon
             })}
           </pre>
         )}

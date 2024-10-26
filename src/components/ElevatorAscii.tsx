@@ -16,7 +16,7 @@ export const ElevatorAscii = ({
       floors[elevatorPosition] = '  [|MA|]  ';
     } else {
       // Marvin is next to the elevator
-      floors[elevatorPosition] = 'MA [|##|]  ';
+      floors[elevatorPosition] = 'MA[|##|]  ';
     }
   } else {
     floors[elevatorPosition] = '  [|##|]  ';
