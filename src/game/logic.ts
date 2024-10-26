@@ -7,6 +7,7 @@ import {
   GAME_CONFIG,
   PollingsMessage,
   UiState,
+  Action,  // Add this import
 } from '@/types';
 import { fetchFromPollinations } from '@/utils/api';
 import { getPersonaPrompt } from '@/prompts';
@@ -61,12 +62,20 @@ const safeJsonParse = (data: string): { message: string; action?: Action } => {
   }
 };
 
+const isValidFloor = (floor: number): floor is 1 | 2 | 3 | 4 | 5 => {
+  return floor >= 1 && floor <= 5;
+};
+
 const fetchPersonaMessage = async (
   persona: Persona, 
   floor: number,
   existingMessages: Message[] = [],
 ): Promise<Message> => {
   try {
+    if (!isValidFloor(floor)) {
+      throw new Error(`Invalid floor number: ${floor}`);
+    }
+
     const messages: PollingsMessage[] = [
       {
         role: 'system',
@@ -82,7 +91,11 @@ const fetchPersonaMessage = async (
     const data = await fetchFromPollinations(messages);
     const response = safeJsonParse(data.choices[0].message.content);
     
-    return { persona, message: response.message || response, action: response.action || 'none' };
+    return { 
+      persona, 
+      message: typeof response === 'string' ? response : response.message,
+      action: typeof response === 'string' ? 'none' : (response.action || 'none')
+    };
   } catch (error) {
     console.error('Error:', error);
     return { persona, message: "Apologies, I'm experiencing some difficulties.", action: 'none' };
