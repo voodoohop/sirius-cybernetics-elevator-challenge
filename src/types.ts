@@ -18,7 +18,7 @@ export const MESSAGE_STYLES = {
 
 export const MESSAGE_PREFIXES = {
   user: '> ',
-  guide: '',
+  guide: 'The Guide Says: ',
   elevator: 'Elevator: ',
   marvin: 'Marvin: '
 } as const;
