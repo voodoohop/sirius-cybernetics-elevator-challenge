@@ -42,7 +42,7 @@ export const ACTION_INDICATORS = {
 } as const;
 
 // Game Types
-export type Persona = 'elevator' | 'marvin' | 'guide';
+export type Persona = keyof typeof MESSAGE_STYLES;
 export type Action = 'none' | 'join' | 'up' | 'down';
 
 export type Message = {
@@ -107,3 +107,10 @@ export type LMMessage = {
 }
 
 export type SetState<T> = React.Dispatch<React.SetStateAction<T>>;
+
+// Consolidate message-related constants
+export const MESSAGE_CONFIG = {
+  STYLES: MESSAGE_STYLES,
+  PREFIXES: MESSAGE_PREFIXES,
+  ACTION_INDICATORS
+} as const;

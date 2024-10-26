@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { 
   GameState, 
   Message, 
@@ -50,29 +50,24 @@ export const messagesToGameState = (messages: Message[]): GameState => {
 
 export const useGameState = (): [GameState, React.Dispatch<GameAction>] => {
   const [messages, setMessages] = useState<Message[]>([]);
-
-  const baseDispatch = (action: GameAction) => {
+  
+  const dispatch = useCallback((action: GameAction) => {
+    console.log('Dispatching action:', action);
     switch (action.type) {
       case 'ADD_MESSAGE':
         setMessages(prev => [...prev, action.message]);
         break;
       case 'SWITCH_PERSONA':
-        setMessages(prev => [
-          ...prev, 
-          {
-            persona: 'guide',
-            message: 'Switching to Marvin mode...',
-            action: 'none'
-          }
-        ]);
-        break;
-      case 'CHEAT_CODE':
+        setMessages(prev => [...prev, { 
+          persona: 'guide', 
+          message: 'Switching to Marvin mode...', 
+          action: 'none' 
+        }]);
         break;
     }
-  };
-  
-  const dispatchWithLogging = createLoggingDispatch(baseDispatch);
-  return [messagesToGameState(messages), dispatchWithLogging];
+  }, []);
+
+  return [messagesToGameState(messages), dispatch];
 };
 
 export const useMessageHandlers = (
@@ -181,20 +176,6 @@ export const useUiState = (initialState: UiState): [UiState, SetState<UiState>] 
 };
 
 // Helper functions
-const createLoggingDispatch = (dispatch: React.Dispatch<GameAction>) => {
-  return (action: GameAction) => {
-    console.log('Dispatching action:', action);
-    dispatch(action);
-  };
-};
-
-const transformMessagesForLM = (messages: Message[]): LMMessage[] => 
-  messages.map(msg => ({
-    role: msg.persona === 'user' ? 'user' : 'assistant',
-    content: JSON.stringify({ message: msg.message, action: msg.action }),
-    ...(msg.persona !== 'user' && { name: msg.persona })
-  }));
-
 const processUserMessage = async (
   message: string,
   gameState: GameState,
@@ -229,15 +210,19 @@ const fetchPersonaMessage = async (
   existingMessages: Message[] = []
 ): Promise<Message> => {
   try {
-    const pollingsMessages: PollingsMessage[] = [
+    const messages = [
       {
-        role: 'system',
+        role: 'system' as const,
         content: getPersonaPrompt(persona, floor)
       },
-      ...transformMessagesForLM(existingMessages)
+      ...existingMessages.map(msg => ({
+        role: msg.persona === 'user' ? 'user' : 'assistant',
+        content: JSON.stringify({ message: msg.message, action: msg.action }),
+        ...(msg.persona !== 'user' && { name: msg.persona })
+      }))
     ];
 
-    const data = await fetchFromPollinations(pollingsMessages);
+    const data = await fetchFromPollinations(messages);
     const response = JSON.parse(data.choices[0].message.content);
     
     return { 
