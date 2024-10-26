@@ -87,9 +87,9 @@ const fetchPersonaMessage = async (
 };
 
 export const useGameState = (): [GameState, React.Dispatch<GameAction>] => {
-  const [messages, setMessages] = useState<Message[]>([
-    { persona: 'elevator', message: 'Hello! Ready for an uplifting journey?', action: 'none' }
-  ]);
+  const [messages, setMessages] = useState<Message[]>([]);
+  // Ensure no duplicate initial messages
+  // ...
   
   const dispatch = useCallback((action: GameAction) => {
     console.log('Dispatching action:', action);
@@ -174,11 +174,10 @@ export const useMessageHandlers = (
 export const useInitialMessage = (gameState: GameState, dispatch: React.Dispatch<GameAction>) => {
   const mounted = useRef(false);
   useEffect(() => {
-    if (mounted.current && gameState.currentPersona === 'elevator') { 
+    if (!mounted.current && gameState.currentPersona === 'elevator') { 
       fetchPersonaMessage(gameState.currentPersona, gameState.currentFloor)
         .then(message => dispatch({ type: 'ADD_MESSAGE', message }));
-    } else {
-      mounted.current = true;
+      mounted.current = true; // Ensure this only runs once
     }
   }, [gameState.currentPersona]);
 };
