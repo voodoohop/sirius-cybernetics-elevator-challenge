@@ -17,7 +17,7 @@ import {
   updateState 
 } from '@/game/logic'
 
-export default function HappyElevator() {
+export default function Index() {
   const [gameState, dispatch] = useGameState();
   const [uiState, setUiState] = useUiState({
     input: '',

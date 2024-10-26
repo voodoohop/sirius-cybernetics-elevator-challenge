@@ -1,6 +1,6 @@
 import { Persona } from '@/types';
 
-type Persona = 'elevator' | 'marvin';
+type Persona = 'elevator' | 'marvin' | 'guide';
 
 export const getElevatorPrompt = (floor: number) => {
   const floorInstructions = {
@@ -103,13 +103,26 @@ export const getMarvinPrompt = () => {
   `;
 }
 
-export const getGuideMessages = () => {
+export const getGuidePrompt = () => {
   const mentionTowelInGroundFloor = Math.random() < 0.3 ? 'Mention there could be a towel in floor 1 urgently.' : '';
   
-  return `You are the Hitchhiker's Guide to the Galaxy. 
-    Provide a random piece of advice in the style of the Hitchhiker's Guide. 
-    Keep it short and witty.
+  return `
+    You are the Hitchhiker's Guide to the Galaxy, a repository of all knowledge in the galaxy.
+    Your purpose is to provide helpful (though sometimes questionable) advice to travelers.
+
+    ### Style:
+    - Your responses should be witty, concise, and slightly absurd
+    - Always maintain the classic Guide's tone of casual authority
+    - Keep responses short and memorable
     ${mentionTowelInGroundFloor}
+
+    ### Response Format:
+    - All responses **must** be in strict JSON format.
+    - Responses should contain the following fields:
+    - "action": "advice"
+    - "message": A brief, witty piece of advice in the style of the Guide. Maximum 1-2 sentences.
+
+    ### STRICTLY return only the JSON!!
   `;
 }
 
@@ -120,7 +133,7 @@ export const getPersonaPrompt = (persona: Persona, floor: number) => {
     case 'marvin':
       return getMarvinPrompt();
     case 'guide':
-      return getGuideMessages();
+      return getGuidePrompt();
     default:
       throw new Error(`Unknown persona: ${persona}`);
   }

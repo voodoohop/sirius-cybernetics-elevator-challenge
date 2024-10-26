@@ -7,14 +7,18 @@ import {
   GAME_CONFIG,
   LMMessage,
   SetState,
-  UiState
+  UiState,
+  PollingsMessage
 } from '@/types';
 import { fetchFromPollinations } from '@/utils/api';
-import { getPersonaPrompt, getGuideMessages } from '@/prompts';
+import { getPersonaPrompt } from '@/prompts';
+
+// Add type for floor numbers
+type FloorNumber = 1 | 2 | 3 | 4 | 5;
 
 export const messagesToGameState = (messages: Message[]): GameState => {
   const state = {
-    currentFloor: GAME_CONFIG.INITIAL_FLOOR,
+    currentFloor: GAME_CONFIG.INITIAL_FLOOR as FloorNumber,
     movesLeft: GAME_CONFIG.TOTAL_MOVES - messages.filter(m => m.persona === 'user').length,
     currentPersona: 'elevator' as Persona,
     firstStageComplete: false,
@@ -32,10 +36,10 @@ export const messagesToGameState = (messages: Message[]): GameState => {
         state.hasWon = true;
         break;
       case 'up':
-        state.currentFloor = Math.min(GAME_CONFIG.FLOORS, state.currentFloor + 1);
+        state.currentFloor = Math.min(GAME_CONFIG.FLOORS, state.currentFloor + 1) as FloorNumber;
         break;
       case 'down':
-        state.currentFloor = Math.max(1, state.currentFloor - 1);
+        state.currentFloor = Math.max(1, state.currentFloor - 1) as FloorNumber;
         if (state.currentFloor === 1) state.firstStageComplete = true;
         break;
     }
@@ -107,7 +111,7 @@ export const useMessageHandlers = (
   const handleGuideAdvice = async () => {
     updateState(setUiState, { isLoading: true });
     try {
-      const advice = await fetchGuideMessage(gameState.messages);
+      const advice = await fetchPersonaMessage('guide', 1, gameState.messages);
       dispatch({ type: 'ADD_MESSAGE', message: advice });
     } finally {
       updateState(setUiState, { isLoading: false });
@@ -186,14 +190,11 @@ const createLoggingDispatch = (dispatch: React.Dispatch<GameAction>) => {
   };
 };
 
-export const updateState = <T extends object>(
-  setState: SetState<T>, 
-  newState: Partial<T>
+export const setUiStateValue = (
+  setUiState: React.Dispatch<React.SetStateAction<UiState>>, 
+  updates: Partial<UiState>
 ) => {
-  setState(prevState => ({
-    ...prevState,
-    ...newState
-  }));
+  setUiState(prev => ({ ...prev, ...updates }));
 };
 
 const transformMessagesForLM = (messages: Message[]): LMMessage[] => {
@@ -261,51 +262,45 @@ const processUserMessage = async (
   }
 };
 
-const fetchInitialMessage = async (persona: Persona, floor: number): Promise<Message> => {
-  try {
-    const data = await fetchFromPollinations([
-      { role: 'system', content: getPersonaPrompt(persona, floor) }
-    ]);
+const fetchInitialMessage = (persona: Persona, floor: number): Promise<Message> => {
+  return fetchPersonaMessage(persona, floor);
+};
 
+const fetchPersonaMessage = async (
+  persona: Persona, 
+  floor: number,
+  existingMessages: Message[] = []
+): Promise<Message> => {
+  try {
+    const pollingsMessages: PollingsMessage[] = [
+      {
+        role: 'system',
+        content: getPersonaPrompt(persona, floor)
+      },
+      ...transformMessagesForLM(existingMessages)
+    ];
+
+    const data = await fetchFromPollinations(pollingsMessages);
     const response = JSON.parse(data.choices[0].message.content);
+    
     return { 
-      persona: persona,
-      message: response.message,
+      persona,
+      message: persona === 'guide' ? `The Guide says: ${response.message}` : response.message,
       action: response.action || 'none'
     };
   } catch (error) {
     console.error('Error:', error);
+    const fallbackMessage = persona === 'guide' 
+      ? "The Guide says: Have you tried turning it off and on again?"
+      : "Apologies, I'm experiencing some difficulties.";
+    
     return { 
-      persona: persona,
-      message: "Apologies, I'm experiencing some difficulties.",
-      action: 'none'
-    };
-  }
-};
-
-const fetchGuideMessage = async (messages: Message[]): Promise<Message> => {
-  try {
-    const data = await fetchFromPollinations([
-      {
-        role: 'system',
-        content: getGuideMessages(),
-        name: 'guide'
-      },
-      ...transformMessagesForLM(messages)
-    ], false);
-
-    const advice = data.choices[0].message.content;
-    return { 
-      persona: 'guide', 
-      message: "The Guide says: " + advice,
-      action: 'none' 
-    };
-  } catch (error) {
-    console.error('Error:', error);
-    return { 
-      persona: 'guide', 
-      message: "The Guide says: Have you tried turning it off and on again?",
+      persona,
+      message: fallbackMessage,
       action: 'none' 
     };
   }
 };
+
+// Export the update state function
+export const updateState = setUiStateValue;
