@@ -1,20 +1,9 @@
 import React from 'react';
 
-// Floor Configuration
-export const FLOORS = {
-  TOP: 5,
-  FOURTH: 4,
-  THIRD: 3,
-  SECOND: 2,
-  GROUND: 1
-} as const;
-
-export type FloorNumber = typeof FLOORS[keyof typeof FLOORS];
-
 // Game Configuration
 export const GAME_CONFIG = {
-  FLOORS: FLOORS.TOP,
-  INITIAL_FLOOR: FLOORS.THIRD,
+  FLOORS: 5,
+  INITIAL_FLOOR: 3,
   TOTAL_MOVES: 15,
   CHEAT_CODE: "42"
 } as const;
@@ -70,7 +59,7 @@ export type Message = {
 }
 
 export type GameState = {
-  currentFloor: FloorNumber;
+  currentFloor: number;
   movesLeft: number;
   currentPersona: Persona;
   firstStageComplete: boolean;
@@ -94,6 +83,7 @@ export type GameAction =
 export type PollingsMessage = {
   role: 'system' | 'user' | 'assistant';
   content: string;
+  name?: string;
 }
 
 export type PollingsResponse = {

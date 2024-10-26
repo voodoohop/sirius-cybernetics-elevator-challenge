@@ -7,15 +7,17 @@ export const ElevatorAscii = ({
   isMarvinMode = false, 
   hasMarvinJoined = false 
 }: ElevatorAsciiProps) => {
-  // Now floor number directly corresponds to array index (floor 1 = index 0)
   const elevatorPosition = floor - 1;
   let floors = Array(GAME_CONFIG.FLOORS).fill('   |  |   ');
   
   if (isMarvinMode) {
-    // Place Marvin on floor 1 (ground floor)
-    const marvinPosition = 0; // Ground floor (floor 1) is at index 0
-    floors[elevatorPosition] = '  [|##|]  '; // Elevator
-    floors[marvinPosition] = hasMarvinJoined ? '  [|MA|]  ' : '  MA     '; // Marvin
+    if (hasMarvinJoined) {
+      // Marvin is in the elevator
+      floors[elevatorPosition] = '  [|MA|]  ';
+    } else {
+      // Marvin is next to the elevator
+      floors[elevatorPosition] = 'MA [|##|]  ';
+    }
   } else {
     floors[elevatorPosition] = '  [|##|]  ';
   }
@@ -31,6 +33,5 @@ export const ElevatorAscii = ({
     }
   }
 
-  // Reverse the array so floor 5 appears at the top
   return floors.reverse().join('\n');
 };
