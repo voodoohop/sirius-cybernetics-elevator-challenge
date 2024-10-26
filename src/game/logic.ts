@@ -52,12 +52,12 @@ export const messagesToGameState = (messages: Message[]): GameState => {
   return state;
 };
 
-const safeJsonParse = (data: string): any => {
+const safeJsonParse = (data: string): { message: string; action?: Action } => {
   try {
     return JSON.parse(data);
   } catch (error) {
     console.error('JSON parse error:', error);
-    return data;
+    return { message: data };
   }
 };
 
@@ -180,9 +180,9 @@ export const useInitialMessage = (gameState: GameState, dispatch: React.Dispatch
     if (!mounted.current && gameState.currentPersona === 'elevator') { 
       fetchPersonaMessage(gameState.currentPersona, gameState.currentFloor)
         .then(message => dispatch({ type: 'ADD_MESSAGE', message }));
-      mounted.current = true; // Ensure this only runs once
+      mounted.current = true;
     }
-  }, [gameState.currentPersona]);
+  }, [gameState.currentPersona, gameState.currentFloor, dispatch]);
 };
 
 export const useMessageScroll = (messages: Message[]) => {
@@ -214,9 +214,8 @@ export const useAutonomousConversation = (
       const lastMessage = gameState.messages[gameState.messages.length - 1];
       const nextSpeaker = lastMessage.persona === 'marvin' ? 'elevator' : 'marvin';
 
-      // Calculate delay based on the number of messages
-      const baseDelay = 2000; // Start with a 2-second delay
-      const delayIncrement = 500; // Increase delay by 1 second for each message
+      const baseDelay = 2000;
+      const delayIncrement = 500;
       const delay = baseDelay + (gameState.messages.length * delayIncrement);
 
       const timer = setTimeout(async () => {
@@ -230,5 +229,5 @@ export const useAutonomousConversation = (
 
       return () => clearTimeout(timer);
     }
-  }, [gameState.messages, gameState.conversationMode]);
+  }, [gameState.messages, gameState.conversationMode, gameState.currentFloor, dispatch]);
 };

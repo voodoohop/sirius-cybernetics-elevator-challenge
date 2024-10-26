@@ -40,7 +40,7 @@ export default function Index() {
     if (gameState.firstStageComplete && gameState.currentPersona === 'elevator') {
       setUiState(prev => ({ ...prev, showInstruction: true }));
     }
-  }, [gameState.firstStageComplete, gameState.currentPersona]);
+  }, [gameState.firstStageComplete, gameState.currentPersona, setUiState]);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen bg-black text-green-400 p-4 font-mono">
