@@ -236,7 +236,7 @@ const processUserMessage = async (
   try {
     const messages = [
       {
-        role: 'system',
+        role: 'system' as const, // Add type assertion here
         content: getPersonaPrompt(gameState.currentPersona, gameState.currentFloor),
         name: gameState.currentPersona
       },
@@ -285,18 +285,14 @@ const fetchPersonaMessage = async (
     
     return { 
       persona,
-      message: persona === 'guide' ? `The Guide says: ${response.message}` : response.message,
+      message: response.message,
       action: response.action || 'none'
     };
   } catch (error) {
     console.error('Error:', error);
-    const fallbackMessage = persona === 'guide' 
-      ? "The Guide says: Have you tried turning it off and on again?"
-      : "Apologies, I'm experiencing some difficulties.";
-    
     return { 
       persona,
-      message: fallbackMessage,
+      message: "Apologies, I'm experiencing some difficulties.",
       action: 'none' 
     };
   }

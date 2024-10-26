@@ -114,6 +114,7 @@ export const getGuidePrompt = () => {
     - Your responses should be witty, concise, and slightly absurd
     - Always maintain the classic Guide's tone of casual authority
     - Keep responses short and memorable
+    - Always prefix your message with "The Guide says:"
     ${mentionTowelInGroundFloor}
 
     ### Response Format:
