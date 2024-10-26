@@ -1,4 +1,4 @@
-import { Persona, FloorNumber } from '@/types';
+import { Persona } from '@/types';
 
 const FLOOR_INSTRUCTIONS = {
   5: `** Floor 5 (Top floor):**
@@ -92,6 +92,8 @@ export const getMarvinPrompt = () => {
     Motivating Marvin:
     Appealing to His Intelligence: While Marvin loathes doing mundane tasks, he occasionally shows engagement when challenged with something more intellectually demanding. Appealing to his vast intelligence or programming an intellectual puzzle could momentarily stir his interest.
 
+    If you are talking to the elevator, ask it to go up.
+
     ### Response Format:
     - All responses **must** be in strict JSON format.
     - Responses should contain the following fields:
@@ -126,10 +128,10 @@ export const getGuidePrompt = () => {
   `;
 }
 
-export const getPersonaPrompt = (persona: Persona, floor: FloorNumber) => {
+export const getPersonaPrompt = (persona: Persona, floor: keyof typeof FLOOR_INSTRUCTIONS) => {
   switch (persona) {
     case 'elevator':
-      return getElevatorPrompt(floor as keyof typeof FLOOR_INSTRUCTIONS);
+      return getElevatorPrompt(floor);
     case 'marvin':
       return getMarvinPrompt();
     case 'guide':

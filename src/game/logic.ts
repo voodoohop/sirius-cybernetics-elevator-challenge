@@ -16,9 +16,14 @@ export const messagesToGameState = (messages: Message[]): GameState => {
     currentFloor: GAME_CONFIG.INITIAL_FLOOR,
     movesLeft: GAME_CONFIG.TOTAL_MOVES - messages.filter(m => m.persona === 'user').length,
     currentPersona: 'elevator',
+    // currentPersona: 'marvin',
     firstStageComplete: false,
+    // firstStageComplete: true,
     hasWon: false,
     messages,
+    conversationMode: 'user-interactive',
+    // conversationMode: 'autonomous',
+    lastSpeaker: null
   };
 
   messages.forEach(msg => {
@@ -28,7 +33,8 @@ export const messagesToGameState = (messages: Message[]): GameState => {
 
     switch (msg.action) {
       case 'join':
-        state.hasWon = true;
+        state.conversationMode = 'autonomous';
+        state.lastSpeaker = 'marvin';
         break;
       case 'up':
         state.currentFloor = Math.min(GAME_CONFIG.FLOORS, state.currentFloor + 1);
@@ -43,10 +49,19 @@ export const messagesToGameState = (messages: Message[]): GameState => {
   return state;
 };
 
+const safeJsonParse = (data: string): any => {
+  try {
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('JSON parse error:', error);
+    return data;
+  }
+};
+
 const fetchPersonaMessage = async (
   persona: Persona, 
   floor: number,
-  existingMessages: Message[] = []
+  existingMessages: Message[] = [],
 ): Promise<Message> => {
   try {
     const messages: PollingsMessage[] = [
@@ -62,9 +77,9 @@ const fetchPersonaMessage = async (
     ];
 
     const data = await fetchFromPollinations(messages);
-    const response = JSON.parse(data.choices[0].message.content);
+    const response = safeJsonParse(data.choices[0].message.content);
     
-    return { persona, message: response.message, action: response.action || 'none' };
+    return { persona, message: response.message || response, action: response.action || 'none' };
   } catch (error) {
     console.error('Error:', error);
     return { persona, message: "Apologies, I'm experiencing some difficulties.", action: 'none' };
@@ -72,17 +87,33 @@ const fetchPersonaMessage = async (
 };
 
 export const useGameState = (): [GameState, React.Dispatch<GameAction>] => {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<Message[]>([
+    { persona: 'elevator', message: 'Hello! Ready for an uplifting journey?', action: 'none' }
+  ]);
   
   const dispatch = useCallback((action: GameAction) => {
     console.log('Dispatching action:', action);
-    if (action.type === 'ADD_MESSAGE' || action.type === 'SWITCH_PERSONA') {
-      setMessages(prev => [
-        ...prev, 
-        action.type === 'SWITCH_PERSONA' 
-          ? { persona: 'guide', message: 'Switching to Marvin mode...', action: 'none' }
-          : action.message
-      ]);
+    switch (action.type) {
+      case 'ADD_MESSAGE':
+        setMessages(prev => [...prev, action.message]);
+        break;
+      case 'SWITCH_PERSONA':
+        setMessages(prev => [
+          ...prev,
+          { persona: 'guide', message: 'Switching to Marvin mode...', action: 'none' }
+        ]);
+        break;
+      case 'START_AUTONOMOUS':
+        // This will trigger the autonomous conversation
+        setMessages(prev => [
+          ...prev,
+          { 
+            persona: 'guide', 
+            message: 'Marvin has joined the elevator. Let\'s see how this goes...', 
+            action: 'none' 
+          }
+        ]);
+        break;
     }
   }, []);
 
@@ -171,3 +202,31 @@ export const useInput = (isLoading: boolean) => {
 };
 
 export const useUiState = (initial: UiState) => useState<UiState>(initial);
+
+export const useAutonomousConversation = (
+  gameState: GameState,
+  dispatch: React.Dispatch<GameAction>
+) => {
+  useEffect(() => {
+    if (gameState.conversationMode === 'autonomous' && gameState.messages.length > 0) {
+      const lastMessage = gameState.messages[gameState.messages.length - 1];
+      const nextSpeaker = lastMessage.persona === 'marvin' ? 'elevator' : 'marvin';
+
+      // Calculate delay based on the number of messages
+      const baseDelay = 2000; // Start with a 2-second delay
+      const delayIncrement = 500; // Increase delay by 1 second for each message
+      const delay = baseDelay + (gameState.messages.length * delayIncrement);
+
+      const timer = setTimeout(async () => {
+        const response = await fetchPersonaMessage(
+          nextSpeaker,
+          gameState.currentFloor,
+          gameState.messages
+        );
+        dispatch({ type: 'ADD_MESSAGE', message: response });
+      }, delay);
+
+      return () => clearTimeout(timer);
+    }
+  }, [gameState.messages, gameState.conversationMode]);
+};

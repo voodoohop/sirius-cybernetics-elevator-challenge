@@ -14,6 +14,7 @@ import {
   useMessageScroll, 
   useInput, 
   useUiState,
+  useAutonomousConversation,
 } from '@/game/logic'
 
 export default function Index() {
@@ -32,6 +33,8 @@ export default function Index() {
     handleGuideAdvice, 
     handlePersonaSwitch 
   } = useMessageHandlers(gameState, dispatch, uiState, setUiState);
+
+  useAutonomousConversation(gameState, dispatch);
 
   useEffect(() => {
     if (gameState.firstStageComplete && gameState.currentPersona === 'elevator') {
@@ -86,7 +89,7 @@ export default function Index() {
         )}
 
         {uiState.showInstruction && gameState.currentPersona === 'marvin' && (
-          <div className="bg-purple-900 text-purple-200 p-4 rounded-lg flex items-center space-x-2">
+          <div className="bg-pink-900/50 text-pink-200 p-4 rounded-lg flex items-center space-x-2">
             <AlertCircle className="w-5 h-5" />
             <p>New challenge: Convince Marvin the Paranoid Android to join you in the elevator!</p>
           </div>
@@ -137,12 +140,12 @@ export default function Index() {
             onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => 
               e.key === 'Enter' && handleMessage(e.currentTarget.value)}
             className="flex-grow bg-gray-800 text-green-400 border-green-400 placeholder-green-600"
-            disabled={uiState.isLoading || gameState.hasWon}
+            disabled={uiState.isLoading || gameState.conversationMode === 'autonomous'}
             ref={inputRef}
           />
           <Button 
             onClick={() => handleMessage(uiState.input)} 
-            disabled={uiState.isLoading || gameState.hasWon}
+            disabled={uiState.isLoading || gameState.conversationMode === 'autonomous'}
             className="bg-green-400 text-black hover:bg-green-500"
           >
             {uiState.isLoading ? 'Processing...' : 'Send'}

@@ -13,7 +13,7 @@ export const MESSAGE_STYLES = {
   user: 'text-yellow-400',
   guide: 'text-blue-400',
   elevator: 'text-green-400',
-  marvin: 'text-green-400'
+  marvin: 'text-red-400'  // Updated to a lighter fuchsia color
 } as const;
 
 export const MESSAGE_PREFIXES = {
@@ -65,6 +65,8 @@ export type GameState = {
   firstStageComplete: boolean;
   hasWon: boolean;
   messages: Message[];
+  conversationMode: 'user-interactive' | 'autonomous';
+  lastSpeaker: 'marvin' | 'elevator' | null;
 }
 
 export type UiState = {
@@ -77,7 +79,8 @@ export type GameAction =
   | { type: 'CHEAT_CODE' }
   | { type: 'ADD_MESSAGE'; message: Message }
   | { type: 'SWITCH_PERSONA'; persona: Persona }
-  | { type: 'ROBOT_RESPONSE'; response: any };
+  | { type: 'START_AUTONOMOUS' }
+  | { type: 'END_GAME' };
 
 // API Types
 export type PollingsMessage = {
