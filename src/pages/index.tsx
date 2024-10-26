@@ -14,7 +14,6 @@ import {
   useMessageScroll, 
   useInput, 
   useUiState,
-  updateState 
 } from '@/game/logic'
 
 export default function Index() {
@@ -36,7 +35,7 @@ export default function Index() {
 
   useEffect(() => {
     if (gameState.firstStageComplete && gameState.currentPersona === 'elevator') {
-      updateState(setUiState, { showInstruction: true });
+      setUiState(prev => ({ ...prev, showInstruction: true }));
     }
   }, [gameState.firstStageComplete, gameState.currentPersona]);
 
@@ -133,7 +132,7 @@ export default function Index() {
           <Input
             type="text"
             value={uiState.input}
-            onChange={(e) => updateState(setUiState, { input: e.target.value })}
+            onChange={(e) => setUiState(prev => ({ ...prev, input: e.target.value }))}
             placeholder={gameState.currentPersona === 'elevator' ? "Communicate with the elevator..." : "Try to convince Marvin..."}
             onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => 
               e.key === 'Enter' && handleMessage(e.currentTarget.value)}

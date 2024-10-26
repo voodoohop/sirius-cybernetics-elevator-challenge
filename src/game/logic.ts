@@ -86,15 +86,16 @@ export const useMessageHandlers = (
     
     if (message === GAME_CONFIG.CHEAT_CODE) {
       dispatch({ type: 'CHEAT_CODE' });
-      updateState(setUiState, { input: '' });
+      setUiState(prev => ({ ...prev, input: '' }));
       return;
     }
 
-    updateState(setUiState, { 
+    setUiState(prev => ({ 
+      ...prev,
       isLoading: true, 
       showInstruction: false,
       input: '' 
-    });
+    }));
 
     try {
       const { response } = await processUserMessage(message, gameState, dispatch);
@@ -104,26 +105,26 @@ export const useMessageHandlers = (
     } catch (error) {
       console.error('Error processing message:', error);
     } finally {
-      updateState(setUiState, { isLoading: false });
+      setUiState(prev => ({ ...prev, isLoading: false }));
     }
   };
 
   const handleGuideAdvice = async () => {
-    updateState(setUiState, { isLoading: true });
+    setUiState(prev => ({ ...prev, isLoading: true }));
     try {
       const advice = await fetchPersonaMessage('guide', 1, gameState.messages);
       dispatch({ type: 'ADD_MESSAGE', message: advice });
     } finally {
-      updateState(setUiState, { isLoading: false });
+      setUiState(prev => ({ ...prev, isLoading: false }));
     }
   };
 
   const handlePersonaSwitch = async () => {
     try {
       dispatch({ type: 'SWITCH_PERSONA', persona: 'marvin' });    
-      const initialMessage = await fetchInitialMessage('marvin', 1);
-      dispatch({ type: 'ADD_MESSAGE', message: initialMessage });
-      updateState(setUiState, { showInstruction: true });
+      const message = await fetchPersonaMessage('marvin', 1);
+      dispatch({ type: 'ADD_MESSAGE', message });
+      setUiState(prev => ({ ...prev, showInstruction: true }));
     } catch (error) {
       console.error('Failed to switch to Marvin:', error);
     }
@@ -144,11 +145,8 @@ export const useInitialMessage = (
 
   useEffect(() => {
     if (mounted.current && gameState.currentPersona === 'elevator') { 
-      const initialMessage = async () => {
-        const message = await fetchInitialMessage(gameState.currentPersona, gameState.currentFloor);
-        dispatch({ type: 'ADD_MESSAGE', message });
-      };
-      initialMessage();
+      fetchPersonaMessage(gameState.currentPersona, gameState.currentFloor)
+        .then(message => dispatch({ type: 'ADD_MESSAGE', message }));
     } else {
       mounted.current = true;
     }
@@ -190,35 +188,12 @@ const createLoggingDispatch = (dispatch: React.Dispatch<GameAction>) => {
   };
 };
 
-export const setUiStateValue = (
-  setUiState: React.Dispatch<React.SetStateAction<UiState>>, 
-  updates: Partial<UiState>
-) => {
-  setUiState(prev => ({ ...prev, ...updates }));
-};
-
-const transformMessagesForLM = (messages: Message[]): LMMessage[] => {
-  return messages.map(msg => {
-    if (msg.persona === 'user') {
-      return {
-        role: 'user',
-        content: JSON.stringify({
-          message: msg.message,
-          action: msg.action
-        })
-      };
-    }
-
-    return {
-      role: 'assistant',
-      content: JSON.stringify({
-        message: msg.message,
-        action: msg.action
-      }),
-      name: msg.persona
-    };
-  });
-};
+const transformMessagesForLM = (messages: Message[]): LMMessage[] => 
+  messages.map(msg => ({
+    role: msg.persona === 'user' ? 'user' : 'assistant',
+    content: JSON.stringify({ message: msg.message, action: msg.action }),
+    ...(msg.persona !== 'user' && { name: msg.persona })
+  }));
 
 const processUserMessage = async (
   message: string,
@@ -234,36 +209,18 @@ const processUserMessage = async (
   dispatch({ type: 'ADD_MESSAGE', message: userMessage });
 
   try {
-    const messages = [
-      {
-        role: 'system' as const, // Add type assertion here
-        content: getPersonaPrompt(gameState.currentPersona, gameState.currentFloor),
-        name: gameState.currentPersona
-      },
-      ...transformMessagesForLM([...gameState.messages, userMessage])
-    ];
-
-    const data = await fetchFromPollinations(messages);
-    const response = JSON.parse(data.choices[0].message.content);
+    const response = await fetchPersonaMessage(
+      gameState.currentPersona, 
+      gameState.currentFloor,
+      [...gameState.messages, userMessage]
+    );
     
-    dispatch({ 
-      type: 'ADD_MESSAGE', 
-      message: {
-        persona: gameState.currentPersona,
-        message: response.message,
-        action: response.action || 'none'
-      }
-    });
-
+    dispatch({ type: 'ADD_MESSAGE', message: response });
     return { response };
   } catch (error) {
     console.error('Error processing message:', error);
     return { response: null };
   }
-};
-
-const fetchInitialMessage = (persona: Persona, floor: number): Promise<Message> => {
-  return fetchPersonaMessage(persona, floor);
 };
 
 const fetchPersonaMessage = async (
@@ -299,4 +256,4 @@ const fetchPersonaMessage = async (
 };
 
 // Export the update state function
-export const updateState = setUiStateValue;
+// export const updateState = setUiStateValue;
