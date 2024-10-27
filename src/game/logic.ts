@@ -26,7 +26,7 @@ export const messagesToGameState = (messages: Message[]): GameState => {
   };
 
   messages.forEach(msg => {
-    if (msg.persona === 'guide' && msg.message === 'Switching to Marvin mode...') {
+    if (msg.persona === 'guide' && msg.message === 'Marvin is waiting outside the elevator, looking particularly gloomy today...') {
       state.currentPersona = 'marvin';
     }
 
@@ -34,18 +34,19 @@ export const messagesToGameState = (messages: Message[]): GameState => {
       case 'join':
         state.conversationMode = 'autonomous';
         state.lastSpeaker = 'marvin';
-        state.marvinJoined = true;  // Set marvinJoined instead of hasWon
+        state.marvinJoined = true;
         break;
       case 'up':
         state.currentFloor = Math.min(GAME_CONFIG.FLOORS, state.currentFloor + 1);
-        // Set hasWon when they reach the top floor together
         if (state.marvinJoined && state.currentFloor === GAME_CONFIG.FLOORS) {
           state.hasWon = true;
         }
         break;
       case 'down':
         state.currentFloor = Math.max(1, state.currentFloor - 1);
-        if (state.currentFloor === 1) state.firstStageComplete = true;
+        if (state.currentFloor === 1) {
+          state.firstStageComplete = true;
+        }
         break;
     }
   });
@@ -111,24 +112,71 @@ export const useGameState = (): [GameState, React.Dispatch<GameAction>] => {
     console.log('Dispatching action:', action);
     switch (action.type) {
       case 'ADD_MESSAGE':
-        setMessages(prev => [...prev, action.message]);
+        setMessages(prev => {
+          const newMessages = [...prev, action.message];
+          const lastMessage = action.message;
+          
+          // Only add guide messages if they haven't been added before
+          if (lastMessage.action === 'join' && !prev.some(m => m.message.includes('Marvin has joined the elevator'))) {
+            return [
+              ...newMessages,
+              {
+                persona: 'guide',
+                message: 'Marvin has joined the elevator. Now sit back and watch the fascinating interaction between these two Genuine People Personalities™...',
+                action: 'none'
+              },
+              {
+                persona: 'guide',
+                message: 'Note: The conversation is now autonomous. Don\'t panic! This is perfectly normal behavior for Sirius Cybernetics products.',
+                action: 'none'
+              }
+            ];
+          }
+
+          if (lastMessage.action === 'down') {
+            const currentFloor = newMessages.reduce((floor, msg) => 
+              msg.action === 'up' ? Math.min(5, floor + 1) : 
+              msg.action === 'down' ? Math.max(1, floor - 1) : 
+              floor, 3);
+            
+            if (currentFloor === 1 && !prev.some(m => m.message.includes('successfully convinced the elevator'))) {
+              return [
+                ...newMessages,
+                {
+                  persona: 'guide',
+                  message: 'You\'ve successfully convinced the elevator to reach the ground floor! But your journey isn\'t over yet...',
+                  action: 'none'
+                }
+              ];
+            }
+          }
+          return newMessages;
+        });
         break;
       case 'SWITCH_PERSONA':
         setMessages(prev => [
           ...prev,
-          { persona: 'guide', message: 'Switching to Marvin mode...', action: 'none' }
-        ]);
-        break;
-      case 'START_AUTONOMOUS':
-        // This will trigger the autonomous conversation
-        setMessages(prev => [
-          ...prev,
           { 
             persona: 'guide', 
-            message: 'Marvin has joined the elevator. Let\'s see how this goes...', 
+            message: 'Marvin is waiting outside the elevator, looking particularly gloomy today...', 
             action: 'none' 
           }
         ]);
+        break;
+      case 'REWIND_TO_PRE_MARVIN':
+        setMessages(prev => {
+          const rewindPoint = prev.findIndex(msg => msg.action === 'join');
+          if (rewindPoint === -1) return prev;
+          const rewoundMessages = prev.slice(0, rewindPoint);
+          return [
+            ...rewoundMessages,
+            {
+              persona: 'guide',
+              message: 'Time circuits activated! We\'ve rewound to just before Marvin joined the elevator. Perhaps things will go differently this time...',
+              action: 'none'
+            }
+          ];
+        });
         break;
     }
   }, []);
@@ -180,6 +228,16 @@ export const useMessageHandlers = (
   },
 
   handlePersonaSwitch: async () => {
+    // First, add the transition message
+    dispatch({ 
+      type: 'ADD_MESSAGE', 
+      message: { 
+        persona: 'guide', 
+        message: 'Marvin is waiting outside the elevator, looking particularly gloomy today...', 
+        action: 'none' 
+      }
+    });
+    
     dispatch({ type: 'SWITCH_PERSONA', persona: 'marvin' });    
     const message = await fetchPersonaMessage('marvin', 1);
     dispatch({ type: 'ADD_MESSAGE', message });

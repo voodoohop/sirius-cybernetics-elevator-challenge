@@ -138,29 +138,58 @@ export default function Index() {
           </div>
         )}
 
-        <div className="flex space-x-2">
-          <Input
-            type="text"
-            value={uiState.input}
-            onChange={(e) => setUiState(prev => ({ ...prev, input: e.target.value }))}
-            placeholder={gameState.currentPersona === 'elevator' ? "Communicate with the elevator..." : "Try to convince Marvin..."}
-            onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => 
-              e.key === 'Enter' && handleMessage(e.currentTarget.value)}
-            className="flex-grow bg-gray-800 text-green-400 border-green-400 placeholder-green-600"
-            disabled={uiState.isLoading || gameState.conversationMode === 'autonomous'}
-            ref={inputRef}
-          />
-          <Button 
-            onClick={() => handleMessage(uiState.input)} 
-            disabled={uiState.isLoading || gameState.conversationMode === 'autonomous'}
-            className="bg-green-400 text-black hover:bg-green-500"
-          >
-            {uiState.isLoading ? 'Processing...' : 'Send'}
-          </Button>
-        </div>
+        {gameState.conversationMode === 'user-interactive' && (
+          <div className="flex space-x-2">
+            <Input
+              type="text"
+              value={uiState.input}
+              onChange={(e) => setUiState(prev => ({ ...prev, input: e.target.value }))}
+              placeholder={gameState.currentPersona === 'elevator' ? "Communicate with the elevator..." : "Try to convince Marvin..."}
+              onKeyPress={(e: React.KeyboardEvent<HTMLInputElement>) => 
+                e.key === 'Enter' && handleMessage(e.currentTarget.value)}
+              className="flex-grow bg-gray-800 text-green-400 border-green-400 placeholder-green-600"
+              ref={inputRef}
+            />
+            <Button 
+              onClick={() => handleMessage(uiState.input)} 
+              className="bg-green-400 text-black hover:bg-green-500"
+            >
+              {uiState.isLoading ? 'Processing...' : 'Send'}
+            </Button>
+          </div>
+        )}
+
+        {gameState.conversationMode === 'autonomous' && (
+          <div className="text-center space-y-4">
+            <div className="bg-blue-900/50 text-blue-200 p-4 rounded-lg">
+              <p className="italic">
+                "The Guide notes: When two Genuine People Personalities™ begin their interaction, human input becomes impossible. Sit back, relax, and observe this rare phenomenon."
+              </p>
+            </div>
+            {/* Only show rewind option after 3 autonomous interactions */}
+            {gameState.messages.filter(m => 
+              gameState.marvinJoined && (m.persona === 'marvin' || m.persona === 'elevator')
+            ).length >= 3 && (
+              <div className="flex flex-col items-center space-y-2">
+                <p className="text-yellow-400 text-sm">
+                  "Should the conversation prove unsatisfactory, the Infinite Improbability Drive may be activated to attempt an alternate reality."
+                </p>
+                <Button
+                  onClick={() => dispatch({ type: 'REWIND_TO_PRE_MARVIN' })}
+                  className="bg-yellow-400 text-black hover:bg-yellow-500 flex items-center space-x-2"
+                >
+                  <span>↺</span>
+                  <span>Activate Infinite Improbability Drive</span>
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
 
         <div className="text-center text-green-400 mt-4">
-          <p className="text-lg font-semibold">Moves Left: {gameState.movesLeft}</p>
+          <p className="text-lg font-semibold">
+            Moves Left: {gameState.conversationMode === 'autonomous' ? 'Auto-pilot Engaged' : gameState.movesLeft}
+          </p>
         </div>
       </Card>
       <div className="text-center text-green-400 mt-2 text-xs max-w-xl mx-auto">

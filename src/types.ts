@@ -82,7 +82,8 @@ export type GameAction =
   | { type: 'ADD_MESSAGE'; message: Message }
   | { type: 'SWITCH_PERSONA'; persona: Persona }
   | { type: 'START_AUTONOMOUS' }
-  | { type: 'END_GAME' };
+  | { type: 'END_GAME' }
+  | { type: 'REWIND_TO_PRE_MARVIN' };  // Add this line
 
 // API Types
 export type PollingsMessage = {
