@@ -5,7 +5,8 @@ export const GAME_CONFIG = {
   FLOORS: 5,
   INITIAL_FLOOR: 3,
   TOTAL_MOVES: 15,
-  CHEAT_CODE: "42"
+  CHEAT_CODE: "42",
+  MARVIN_TRANSITION_MSG: 'Marvin is waiting outside the elevator, looking particularly gloomy today...'
 } as const;
 
 // Message Display Configuration

@@ -26,7 +26,7 @@ export const messagesToGameState = (messages: Message[]): GameState => {
   };
 
   messages.forEach(msg => {
-    if (msg.persona === 'guide' && msg.message === 'Marvin is waiting outside the elevator, looking particularly gloomy today...') {
+    if (msg.persona === 'guide' && msg.message === GAME_CONFIG.MARVIN_TRANSITION_MSG) {
       state.currentPersona = 'marvin';
     }
 
@@ -158,7 +158,7 @@ export const useGameState = (): [GameState, React.Dispatch<GameAction>] => {
           ...prev,
           { 
             persona: 'guide', 
-            message: 'Marvin is waiting outside the elevator, looking particularly gloomy today...', 
+            message: GAME_CONFIG.MARVIN_TRANSITION_MSG, 
             action: 'none' 
           }
         ]);
@@ -228,16 +228,6 @@ export const useMessageHandlers = (
   },
 
   handlePersonaSwitch: async () => {
-    // First, add the transition message
-    dispatch({ 
-      type: 'ADD_MESSAGE', 
-      message: { 
-        persona: 'guide', 
-        message: 'Marvin is waiting outside the elevator, looking particularly gloomy today...', 
-        action: 'none' 
-      }
-    });
-    
     dispatch({ type: 'SWITCH_PERSONA', persona: 'marvin' });    
     const message = await fetchPersonaMessage('marvin', 1);
     dispatch({ type: 'ADD_MESSAGE', message });
@@ -285,8 +275,9 @@ export const useAutonomousConversation = (
       const lastMessage = gameState.messages[gameState.messages.length - 1];
       const nextSpeaker = lastMessage.persona === 'marvin' ? 'elevator' : 'marvin';
 
-      const baseDelay = 2000;
-      const delayIncrement = 500;
+      // Keep base delay the same but increase increment
+      const baseDelay = 1000;
+      const delayIncrement = 500;  // Changed from 100 to 500
       const delay = baseDelay + (gameState.messages.length * delayIncrement);
 
       const timer = setTimeout(async () => {
