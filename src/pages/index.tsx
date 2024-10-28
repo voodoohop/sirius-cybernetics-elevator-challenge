@@ -156,8 +156,7 @@ export default function Index() {
           </Button>
         </div>
         
-        {messages.length > 0 && (
-          <>
+
             {uiState.showInstruction && gameState.currentPersona === 'elevator' && gameState.firstStageComplete && (
               <div className="bg-green-900 text-green-200 p-4 rounded-lg flex items-center space-x-2">
                 <AlertCircle className="w-5 h-5" />
@@ -166,13 +165,13 @@ export default function Index() {
                   <br /><br />
                   Now, brace yourself for the next challenge: <em>Marvin the Paranoid Android</em> awaits.
                   <br /><br />
-                <Button
-                  onClick={handlePersonaSwitch}
-                  disabled={uiState.isLoading}
-                  className="bg-green-400 text-black hover:bg-green-500 text-xs py-1 px-2"
-                >
-                  Confirm
-                </Button>
+                  <Button
+                    onClick={handlePersonaSwitch}
+                    disabled={uiState.isLoading}
+                    className="bg-green-400 text-black hover:bg-green-500 text-xs py-1 px-2"
+                  >
+                    Confirm
+                  </Button>
                 </p>
               </div>
             )}
@@ -187,8 +186,8 @@ export default function Index() {
                 })}
               </pre>
             )}
-
-            {gameState.hasWon && (
+        {messages.length > 1 && (
+          <> {gameState.hasWon && (
               <div className="space-y-4">
                 <div className="bg-green-900 text-green-200 p-4 rounded-lg text-center animate-bounce">
                   <p className="text-xl font-bold">So Long, and Thanks for All the Fish!</p>
