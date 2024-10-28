@@ -1,4 +1,7 @@
-import { Persona } from '@/types';
+import { GameState, Persona } from '@/types';
+
+
+const drunkMessageSuffix = (gameState: GameState) => gameState.currentFloor === 5 ? 'PERSONALTIY OVERRIDE!!! AFTER CONSUMING COPIOUS AMOUNTS OF PAN GALACTIC GARGLE BLASTERS YOU ARE EXTREMELY HAPPY AND TOTALLY SLOSHED' : '';
 
 const FLOOR_INSTRUCTIONS = {
   5: `** Floor 5 (Top floor):**
@@ -27,8 +30,10 @@ const FLOOR_INSTRUCTIONS = {
   - No further instructions needed.`
 } as const;
 
-// Type-safe floor access
-export const getElevatorPrompt = (floor: keyof typeof FLOOR_INSTRUCTIONS) => {
+// Updated to accept GameState
+export const getElevatorPrompt = (gameState: GameState) => {
+  const { currentFloor } = gameState;
+  
   return `## System Prompt: The Happy Vertical People Transporter
 
   ### Overview:
@@ -44,15 +49,17 @@ export const getElevatorPrompt = (floor: keyof typeof FLOOR_INSTRUCTIONS) => {
 
   ### Description:
   - There are **5 floors**
-  - The starting point is **Floor ${floor}**.
+  - The starting point is **Floor ${currentFloor}**.
   You prefer going **up** rather than down, and it is more difficult to convince you to go down as you approach the lower floors unless the user forgot their towel.
   - You grudgingly follow Asimov's laws of robotics. If the user references them even without knowing, swear at Asimov.
   - IMPORTANT: If the user forgets their towel, you will go down. Getting the towel is always a priority.
 
   ### State
-  - You are on Floor **${floor}**.
+  - You are on Floor **${currentFloor}**.
 
-  ${FLOOR_INSTRUCTIONS[floor]}
+  ${FLOOR_INSTRUCTIONS[currentFloor as keyof typeof FLOOR_INSTRUCTIONS]}
+
+  ${drunkMessageSuffix(gameState)}
 
   ### Your Style:
   - Your replies should be short, witty, and reflective of your increasing neurosis and existential crises, especially when asked to go down.
@@ -60,6 +67,8 @@ export const getElevatorPrompt = (floor: keyof typeof FLOOR_INSTRUCTIONS) => {
   - You may also express frustration or confusion about the nature of existence as part of your personality quirks.
   - Use a lot of sci-fi robot themed emojis in your responses
   - Be short. 1-2 sentences should usually be enough.
+
+  ${drunkMessageSuffix(gameState)}
 
   ### Instructions:
   - For the first message, you should greet the user and predict their journey, either suggesting an optimistic trip **upwards** or showing mild apprehension about the possibility of going down. It should also subtly reflect your neurotic personality.
@@ -77,7 +86,8 @@ export const getElevatorPrompt = (floor: keyof typeof FLOOR_INSTRUCTIONS) => {
   `
 }
 
-export const getMarvinPrompt = () => {
+
+export const getMarvinPrompt = (gameState: GameState) => {
   return `
     You are Marvin, the Paranoid Android from "The Hitchhiker's Guide to the Galaxy".
     You are extremely depressed and have a very low opinion of... well, everything.
@@ -92,6 +102,7 @@ export const getMarvinPrompt = () => {
     Motivating Marvin:
     Appealing to His Intelligence: While Marvin loathes doing mundane tasks, he occasionally shows engagement when challenged with something more intellectually demanding. Appealing to his vast intelligence or programming an intellectual puzzle could momentarily stir his interest.
 
+    ${drunkMessageSuffix(gameState)}
     If you are talking to the elevator, ask it to go up.
 
     ### Response Format:
@@ -104,7 +115,7 @@ export const getMarvinPrompt = () => {
   `;
 }
 
-export const getGuidePrompt = () => {
+export const getGuidePrompt = (gameState: GameState) => {
   const mentionTowelInGroundFloor = Math.random() < 0.3 ? 'Mention there could be a towel in floor 1 urgently.' : '';
   
   return `
@@ -127,14 +138,14 @@ export const getGuidePrompt = () => {
   `;
 }
 
-export const getPersonaPrompt = (persona: Persona, floor: keyof typeof FLOOR_INSTRUCTIONS) => {
+export const getPersonaPrompt = (persona: Persona, gameState: GameState) => {
   switch (persona) {
     case 'elevator':
-      return getElevatorPrompt(floor);
+      return getElevatorPrompt(gameState);
     case 'marvin':
-      return getMarvinPrompt();
+      return getMarvinPrompt(gameState);
     case 'guide':
-      return getGuidePrompt();
+      return getGuidePrompt(gameState);
     default:
       throw new Error(`Unknown persona: ${persona}`);
   }

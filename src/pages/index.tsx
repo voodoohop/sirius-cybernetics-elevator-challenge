@@ -49,7 +49,7 @@ export default function Index() {
 
       const response = await fetchPersonaMessage(
         gameState.currentPersona, 
-        gameState.currentFloor,
+        gameState,
         [...messages, userMessage]
       );
       
