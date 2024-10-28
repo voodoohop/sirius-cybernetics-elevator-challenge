@@ -95,20 +95,17 @@ const isValidFloor = (floor: number): floor is 1 | 2 | 3 | 4 | 5 => {
   return floor >= 1 && floor <= 5;
 };
 
+// Update the fetchPersonaMessage function
 export const fetchPersonaMessage = async (
   persona: Persona, 
-  floor: number,
+  gameState: GameState,
   existingMessages: Message[] = [],
 ): Promise<Message> => {
   try {
-    if (!isValidFloor(floor)) {
-      throw new Error(`Invalid floor number: ${floor}`);
-    }
-
     const messages: PollingsMessage[] = [
       {
         role: 'system' as const,
-        content: getPersonaPrompt(persona, floor)
+        content: getPersonaPrompt(persona, gameState)
       },
       ...existingMessages.map(msg => ({
         role: (msg.persona === 'user' ? 'user' : 'assistant') as const,
@@ -157,12 +154,27 @@ export const useGuideMessages = (
 
     // floor changed
     useEffect(() => {
-        addMessage({
-            persona: 'guide',
-            message: `Now arriving at floor ${gameState.currentFloor}...`,
-            action: 'none'
-        });
-    }, [gameState.currentFloor, addMessage]);
+        if (gameState.currentFloor === 5) {
+            if (gameState.marvinJoined)
+                addMessage({
+                    persona: 'guide',
+                    message: 'Pan Galactic Gargle Blasters are being prepared for your enjoyment. Even Marvin will enjoy one!',
+                    action: 'none'
+                });
+            else 
+            addMessage({
+                persona: 'guide',
+                message: `Now arriving at floor ${gameState.currentFloor}... The Pan Galactic Gargle Blasters are being prepared, but they're only served to a minimum of two people. Perhaps Marvin would enjoy one? (Though he'd probably just complain about it...)`,
+                action: 'none'
+            });
+        } else {
+            addMessage({
+                persona: 'guide',
+                message: `Now arriving at floor ${gameState.currentFloor}...`,
+                action: 'none'
+            });
+        }
+    }, [gameState.currentFloor, gameState.marvinJoined, addMessage]);
 };
 
 // Autonomous conversation hook
@@ -176,19 +188,19 @@ export const useAutonomousConversation = (
 
     const lastMessage = messages[messages.length - 1];
     const nextSpeaker = lastMessage.persona === 'marvin' ? 'elevator' : 'marvin';
-    const delay = 1000 + (messages.length * 500);
+    const delay = 1000 + (messages.length * 250);
 
     const timer = setTimeout(async () => {
       const response = await fetchPersonaMessage(
         nextSpeaker,
-        gameState.currentFloor,
+        gameState,
         messages
       );
       addMessage(response);
     }, delay);
 
     return () => clearTimeout(timer);
-  }, [messages, gameState.conversationMode, gameState.currentFloor, addMessage]);
+  }, [messages, gameState, addMessage]);
 };
 
 // Add this helper function near the top
@@ -230,7 +242,7 @@ export const useMessageHandlers = (
     
     setUiState((prev: UiState) => ({ ...prev, isLoading: true }));
     try {
-      const response = await fetchPersonaMessage('guide', gameState.currentFloor, messages);
+      const response = await fetchPersonaMessage('guide', gameState, messages);
       addMessage(response);
     } finally {
       setUiState((prev: UiState) => ({ ...prev, isLoading: false }));
