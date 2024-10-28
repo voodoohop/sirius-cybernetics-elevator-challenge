@@ -17,26 +17,46 @@ export const useMessages = () => {
   const [messages, setMessages] = useState<Message[]>([]);
 
   const addMessage = useCallback((message: Message) => {
-    setMessages(prev => [...prev, message]);
+    setMessages(appendIfNotDuplicate(message));
   }, []);
 
   return { messages, addMessage };
 };
 
+// append only if the last message is not the same
+const appendIfNotDuplicate = (message: Message) => {
+    return (messages: Message[]) => {
+        const stringifiedMessage = JSON.stringify(message);
+        const lastMessage = JSON.stringify(messages[messages.length - 1]);
+        return lastMessage !== stringifiedMessage ? [...messages, message] : messages;
+    }
+};
+
 // Pure function to compute game state from messages
 export const computeGameState = (messages: Message[]): GameState => {
-  return messages.reduce((state, msg) => {
+  const initialState: GameState = {
+    currentFloor: GAME_CONFIG.INITIAL_FLOOR,
+    movesLeft: GAME_CONFIG.TOTAL_MOVES - messages.filter(m => m.persona === 'user').length,
+    currentPersona: 'elevator',
+    firstStageComplete: false,
+    hasWon: false,
+    conversationMode: 'user-interactive',
+    lastSpeaker: null,
+    marvinJoined: false
+  };
+
+  return messages.reduce<GameState>((state, msg) => {
     const nextState = { ...state };
 
     if (msg.persona === 'guide' && msg.message === GAME_CONFIG.MARVIN_TRANSITION_MSG) {
-      nextState.currentPersona = 'marvin';
+      nextState.currentPersona = 'marvin' as const;
     }
 
     switch (msg.action) {
       case 'join':
         return {
           ...nextState,
-          conversationMode: 'autonomous',
+          conversationMode: 'autonomous' as const,
           lastSpeaker: 'marvin',
           marvinJoined: true
         };
@@ -59,16 +79,7 @@ export const computeGameState = (messages: Message[]): GameState => {
       default:
         return nextState;
     }
-  }, {
-    currentFloor: GAME_CONFIG.INITIAL_FLOOR,
-    movesLeft: GAME_CONFIG.TOTAL_MOVES - messages.filter(m => m.persona === 'user').length,
-    currentPersona: 'elevator',
-    firstStageComplete: false,
-    hasWon: false,
-    conversationMode: 'user-interactive',
-    lastSpeaker: null,
-    marvinJoined: false
-  });
+  }, initialState);
 };
 
 const safeJsonParse = (data: string): { message: string; action?: Action } => {
@@ -96,11 +107,11 @@ export const fetchPersonaMessage = async (
 
     const messages: PollingsMessage[] = [
       {
-        role: 'system',
+        role: 'system' as const,
         content: getPersonaPrompt(persona, floor)
       },
       ...existingMessages.map(msg => ({
-        role: msg.persona === 'user' ? 'user' : 'assistant',
+        role: (msg.persona === 'user' ? 'user' : 'assistant') as const,
         content: JSON.stringify({ message: msg.message, action: msg.action }),
         ...(msg.persona !== 'user' && { name: msg.persona })
       }))
@@ -131,36 +142,27 @@ export const useGuideMessages = (
   messages: Message[], 
   addMessage: (message: Message) => void
 ) => {
-  useEffect(() => {
     const lastMessage = messages[messages.length - 1];
-    if (!lastMessage) return;
 
-    // Handle Marvin join message
-    if (lastMessage.action === 'join' && 
-        !messages.some(m => m.message.includes('Marvin has joined the elevator'))) {
-      addMessage({
-        persona: 'guide',
-        message: 'Marvin has joined the elevator. Now sit back and watch the fascinating interaction between these two Genuine People Personalities™...',
-        action: 'none'
-      });
-      addMessage({
-        persona: 'guide',
-        message: 'Note: The conversation is now autonomous. Don\'t panic! This is perfectly normal behavior for Sirius Cybernetics products.',
-        action: 'none'
-      });
-    }
+    // marvin joined 
+    useEffect(() => {
+        if (lastMessage?.action === 'join') {
+            addMessage({
+                persona: 'guide',
+                message: 'Marvin has joined the elevator. Now sit back and watch the fascinating interaction between these two Genuine People Personalities™...',
+                action: 'none'
+            });
+        }
+    }, [lastMessage, addMessage]);
 
-    // Handle reaching ground floor message
-    if (lastMessage.action === 'down' && 
-        gameState.currentFloor === 1 && 
-        !messages.some(m => m.message.includes('successfully convinced the elevator'))) {
-      addMessage({
-        persona: 'guide',
-        message: 'You\'ve successfully convinced the elevator to reach the ground floor! But your journey isn\'t over yet...',
-        action: 'none'
-      });
-    }
-  }, [messages, gameState.currentFloor, addMessage]);
+    // floor changed
+    useEffect(() => {
+        addMessage({
+            persona: 'guide',
+            message: `Now arriving at floor ${gameState.currentFloor}...`,
+            action: 'none'
+        });
+    }, [gameState.currentFloor, addMessage]);
 };
 
 // Autonomous conversation hook
@@ -193,18 +195,18 @@ export const useMessageHandlers = (
   gameState: GameState,
   messages: Message[],
   uiState: UiState,
-  setUiState: (state: UiState) => void,
+  setUiState: React.Dispatch<React.SetStateAction<UiState>>,
   addMessage: (message: Message) => void
 ) => {
   const handleGuideAdvice = useCallback(async () => {
     if (uiState.isLoading) return;
     
-    setUiState(prev => ({ ...prev, isLoading: true }));
+    setUiState((prev: UiState) => ({ ...prev, isLoading: true }));
     try {
       const response = await fetchPersonaMessage('guide', gameState.currentFloor, messages);
       addMessage(response);
     } finally {
-      setUiState(prev => ({ ...prev, isLoading: false }));
+      setUiState((prev: UiState) => ({ ...prev, isLoading: false }));
     }
   }, [gameState.currentFloor, messages, uiState.isLoading, setUiState, addMessage]);
 
