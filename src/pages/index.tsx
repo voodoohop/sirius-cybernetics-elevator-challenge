@@ -26,7 +26,7 @@ import { GargleBlaster } from '@/components/GargleBlaster';
 import { Message } from '@/types'
 
 export default function Index() {
-  const { messages, addMessage } = useMessages();
+  const { messages, addMessage, setMessages } = useMessages();
   const gameState = useGameState(messages);
   const [uiState, setUiState] = useUiState({
     input: '',
@@ -69,7 +69,8 @@ export default function Index() {
     messages,
     uiState,
     setUiState,
-    addMessage
+    addMessage,
+    setMessages
   );
 
   useEffect(() => {

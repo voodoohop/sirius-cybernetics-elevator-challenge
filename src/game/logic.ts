@@ -20,7 +20,7 @@ export const useMessages = () => {
     setMessages(appendIfNotDuplicate(message));
   }, []);
 
-  return { messages, addMessage };
+  return { messages, addMessage, setMessages };
 };
 
 // append only if the last message is not the same
@@ -191,12 +191,39 @@ export const useAutonomousConversation = (
   }, [messages, gameState.conversationMode, gameState.currentFloor, addMessage]);
 };
 
+// Add this helper function near the top
+const findMarvinTransitionIndex = (messages: Message[]): number => {
+  return messages.findIndex(msg => 
+    msg.persona === 'guide' && 
+    msg.message === GAME_CONFIG.MARVIN_TRANSITION_MSG
+  );
+};
+
+// Update the helper function to find the start of the Marvin join interaction
+const findMarvinJoinStartIndex = (messages: Message[]): number => {
+  const marvinJoinIndex = messages.findIndex(msg => 
+    msg.persona === 'marvin' && msg.action === 'join'
+  );
+  
+  if (marvinJoinIndex === -1) return -1;
+  
+  // Find the user message that triggered this interaction
+  for (let i = marvinJoinIndex - 1; i >= 0; i--) {
+    if (messages[i].persona === 'user') {
+      return i;
+    }
+  }
+  
+  return marvinJoinIndex;
+};
+
 export const useMessageHandlers = (
   gameState: GameState,
   messages: Message[],
   uiState: UiState,
   setUiState: React.Dispatch<React.SetStateAction<UiState>>,
-  addMessage: (message: Message) => void
+  addMessage: (message: Message) => void,
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>> // Add this parameter
 ) => {
   const handleGuideAdvice = useCallback(async () => {
     if (uiState.isLoading) return;
@@ -211,12 +238,27 @@ export const useMessageHandlers = (
   }, [gameState.currentFloor, messages, uiState.isLoading, setUiState, addMessage]);
 
   const handlePersonaSwitch = useCallback(() => {
-    addMessage({
-      persona: 'guide',
-      message: GAME_CONFIG.MARVIN_TRANSITION_MSG,
-      action: 'none'
-    });
-  }, [addMessage]);
+    if (gameState.conversationMode === 'autonomous') {
+      // Rewind functionality
+      const rewindIndex = findMarvinJoinStartIndex(messages);
+      if (rewindIndex !== -1) {
+        setMessages(messages.slice(0, rewindIndex));
+        setUiState(prev => ({ 
+          ...prev, 
+          showInstruction: true,
+          isLoading: false,
+          input: ''
+        }));
+      }
+    } else {
+      // Original transition to Marvin functionality
+      addMessage({
+        persona: 'guide',
+        message: GAME_CONFIG.MARVIN_TRANSITION_MSG,
+        action: 'none'
+      });
+    }
+  }, [messages, gameState.conversationMode, setMessages, setUiState, addMessage]);
 
   return {
     handleGuideAdvice,
