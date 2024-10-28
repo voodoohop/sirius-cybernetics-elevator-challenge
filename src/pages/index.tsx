@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Button } from "@/components/ui/button"
 import { Card } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -19,7 +19,6 @@ import {
 import {
   useMessageScroll,
   useInput,
-  useUiState
 } from '@/hooks/ui'
 
 import { GargleBlaster } from '@/components/GargleBlaster';
@@ -28,10 +27,7 @@ import { Message } from '@/types'
 export default function Index() {
   const { messages, addMessage, setMessages } = useMessages();
   const gameState = useGameState(messages);
-  const [uiState, setUiState] = useUiState({
-    input: '',
-    showInstruction: true
-  });
+  const [inputPrompt, setInputPrompt] = useState('');
 
   useGuideMessages(gameState, messages, addMessage);
   useAutonomousConversation(gameState, messages, addMessage);
@@ -40,7 +36,7 @@ export default function Index() {
   const handleMessage = async (message: string) => {
     if (!message.trim() || gameState.movesLeft <= 0) return;
     
-    setUiState(prev => ({ ...prev, showInstruction: false, input: '' }));
+    setInputPrompt('');
 
     try {
       const userMessage: Message = { persona: 'user', message, action: 'none' };
@@ -59,23 +55,16 @@ export default function Index() {
   };
 
   const messagesEndRef = useMessageScroll(messages);
-  const { inputRef } = useInput(uiState.isLoading);
+  const { inputRef } = useInput(gameState.isLoading);
   const { 
     handleGuideAdvice, 
     handlePersonaSwitch 
   } = useMessageHandlers(
     gameState,
     messages,
-    setUiState,
     addMessage,
     setMessages
   );
-
-  useEffect(() => {
-    if (gameState.firstStageComplete && gameState.currentPersona === 'elevator') {
-      setUiState(prev => ({ ...prev, showInstruction: true }));
-    }
-  }, [gameState.firstStageComplete, gameState.currentPersona, setUiState]);
 
   useEffect(() => {
     // Focus input when it becomes enabled
@@ -118,7 +107,7 @@ export default function Index() {
             <AlertCircle className="w-5 h-5" />
             <div>
               <p>Psst! Your mission: Convince this neurotic elevator to reach the ground floor. Remember your towel!</p>
-              {uiState.showInstruction && gameState.currentPersona === 'elevator' && !gameState.firstStageComplete && (
+              {gameState.showInstruction && gameState.currentPersona === 'elevator' && !gameState.firstStageComplete && (
                 <p className="text-yellow-200 font-bold border-t border-blue-700 mt-3 pt-3">
                   <strong>Sub-etha News Flash:</strong> New Genuine People Personalities™ scenarios detected in building mainframe. Prepare for Marvin!
                 </p>
@@ -167,7 +156,7 @@ export default function Index() {
         </div>
         
 
-            {uiState.showInstruction && gameState.currentPersona === 'elevator' && gameState.firstStageComplete && (
+            {gameState.showInstruction && gameState.currentPersona === 'elevator' && gameState.firstStageComplete && (
               <div className="bg-green-900 text-green-200 p-4 rounded-lg flex items-center space-x-2">
                 <AlertCircle className="w-5 h-5" />
                 <p>
@@ -190,7 +179,7 @@ export default function Index() {
               <pre className="text-green-400 text-center">
                 {ElevatorAscii({
                   floor: gameState.currentFloor,
-                  showLegend: uiState.showInstruction,
+                  showLegend: gameState.showInstruction,
                   isMarvinMode: gameState.currentPersona === 'marvin',
                   hasMarvinJoined: gameState.marvinJoined
                 })}
@@ -233,16 +222,16 @@ export default function Index() {
               <div className="flex space-x-2">
                 <Input
                   type="text"
-                  value={uiState.input}
-                  onChange={(e) => setUiState(prev => ({ ...prev, input: e.target.value }))}
+                  value={inputPrompt}
+                  onChange={(e) => setInputPrompt(e.target.value)}
                   placeholder={gameState.currentPersona === 'elevator' ? "Communicate with the elevator..." : "Try to convince Marvin..."}
-                  onKeyPress={(e) => e.key === 'Enter' && handleMessage(uiState.input)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleMessage(inputPrompt)}
                   className="flex-grow bg-gray-800 text-green-400 border-green-400 placeholder-green-600"
                   ref={inputRef}
                   disabled={gameState.isLoading || (gameState.currentPersona === 'elevator' && gameState.firstStageComplete)}
                 />
                 <Button 
-                  onClick={() => handleMessage(uiState.input)} 
+                  onClick={() => handleMessage(inputPrompt)} 
                   className="bg-green-400 text-black hover:bg-green-500"
                   disabled={gameState.isLoading || (gameState.currentPersona === 'elevator' && gameState.firstStageComplete)}
                 >

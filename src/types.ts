@@ -52,7 +52,7 @@ export const API_CONFIG = {
 
 // Game Types
 export type Persona = 'user' | 'marvin' | 'elevator' | 'guide';
-export type Action = 'none' | 'join' | 'up' | 'down';
+export type Action = 'none' | 'join' | 'up' | 'down' | 'show_instructions';
 
 export type Message = {
   persona: 'user' | 'marvin' | 'elevator' | 'guide';
@@ -69,12 +69,8 @@ export type GameState = {
   conversationMode: 'user-interactive' | 'autonomous';
   lastSpeaker: 'marvin' | 'elevator' | null;
   marvinJoined: boolean;
-  isLoading: boolean;  // Added this
-}
-
-export interface UiState {
-  input: string;
   showInstruction: boolean;
+  isLoading: boolean;  // Added this
 }
 
 export type GameAction =

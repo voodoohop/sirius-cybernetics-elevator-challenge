@@ -5,11 +5,11 @@ import {
   Persona, 
   GAME_CONFIG,
   PollingsMessage,
-  UiState,
   Action,
 } from '@/types';
 import { fetchFromPollinations } from '@/utils/api';
 import { getPersonaPrompt } from '@/prompts';
+import { getFloorMessage } from '@/prompts';
 
 // Core message management hook
 export const useMessages = () => {
@@ -42,11 +42,18 @@ export const computeGameState = (messages: Message[]): GameState => {
     conversationMode: 'user-interactive',
     lastSpeaker: null,
     marvinJoined: false,
+    showInstruction: true,
     isLoading: messages.length === 0 || messages[messages.length - 1]?.persona === 'user'
   };
 
   return messages.reduce<GameState>((state, msg) => {
     const nextState = { ...state };
+
+    nextState.showInstruction = msg.action === 'show_instructions';
+
+
+
+
     nextState.isLoading = msg.persona === 'user';
 
     if (msg.persona === 'guide' && msg.message === GAME_CONFIG.MARVIN_TRANSITION_MSG) {
@@ -92,9 +99,6 @@ const safeJsonParse = (data: string): { message: string; action?: Action } => {
   }
 };
 
-const isValidFloor = (floor: number): floor is 1 | 2 | 3 | 4 | 5 => {
-  return floor >= 1 && floor <= 5;
-};
 
 // Update the fetchPersonaMessage function
 export const fetchPersonaMessage = async (
@@ -155,20 +159,12 @@ export const useGuideMessages = (
 
     // floor changed
     useEffect(() => {
-        if (gameState.currentFloor === 5) {
-            addMessage({
-                persona: 'guide',
-                message: `Now arriving at floor ${gameState.currentFloor}... The Pan Galactic Gargle Blasters are being prepared, but they're only served to a minimum of two people. Perhaps Marvin would enjoy one? (Though he'd probably just complain about it...)`,
-                action: 'none'
-            });
-        } else {
-            addMessage({
-                persona: 'guide',
-                message: `Now arriving at floor ${gameState.currentFloor}...`,
-                action: 'none'
-            });
-        }
-    }, [gameState.currentFloor,  addMessage]);
+        addMessage({
+            persona: 'guide',
+            message: getFloorMessage(gameState),
+            action: 'show_instructions'
+        });
+    }, [gameState.currentFloor, addMessage]);
 };
 
 // Autonomous conversation hook
@@ -223,12 +219,30 @@ const findMarvinJoinStartIndex = (messages: Message[]): number => {
   return marvinJoinIndex;
 };
 
+// Helper function to gradually remove messages
+const rewindMessages = (
+  messages: Message[], 
+  targetIndex: number,
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>
+) => {
+  let currentIndex = messages.length;
+  
+  const removeMessage = () => {
+    if (currentIndex > targetIndex) {
+      currentIndex--;
+      setMessages(messages.slice(0, currentIndex));
+      setTimeout(removeMessage, 300);
+    }
+  };
+
+  removeMessage();
+};
+
 export const useMessageHandlers = (
   gameState: GameState,
   messages: Message[],
-  setUiState: React.Dispatch<React.SetStateAction<UiState>>,
   addMessage: (message: Message) => void,
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>> // Add this parameter
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>>
 ) => {
   const handleGuideAdvice = useCallback(async () => {
     if (gameState.isLoading) return;
@@ -243,15 +257,10 @@ export const useMessageHandlers = (
 
   const handlePersonaSwitch = useCallback(() => {
     if (gameState.conversationMode === 'autonomous') {
-      // Rewind functionality
+      // Rewind functionality with animation
       const rewindIndex = findMarvinJoinStartIndex(messages);
       if (rewindIndex !== -1) {
-        setMessages(messages.slice(0, rewindIndex));
-        setUiState(prev => ({ 
-          ...prev, 
-          showInstruction: true,
-          input: ''
-        }));
+        rewindMessages(messages, rewindIndex, setMessages);
       }
     } else {
       // Original transition to Marvin functionality
@@ -261,7 +270,7 @@ export const useMessageHandlers = (
         action: 'none'
       });
     }
-  }, [messages, gameState.conversationMode, setMessages, setUiState, addMessage]);
+  }, [messages, gameState.conversationMode, setMessages, addMessage]);
 
   return {
     handleGuideAdvice,

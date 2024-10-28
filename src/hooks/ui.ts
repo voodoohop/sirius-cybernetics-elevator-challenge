@@ -1,6 +1,5 @@
 import { useRef, useEffect } from 'react';
-import { Message, UiState } from '@/types';
-import { useState } from 'react';
+import { Message } from '@/types';
 
 // Scroll management hook
 export const useMessageScroll = (messages: Message[]) => {
@@ -21,6 +20,3 @@ export const useInput = (isLoading: boolean) => {
   }, [isLoading]);
   return { inputRef: ref };
 };
-
-// UI state management hook
-export const useUiState = (initial: UiState) => useState<UiState>(initial);
