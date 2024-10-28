@@ -46,13 +46,10 @@ export const computeGameState = (messages: Message[]): GameState => {
     isLoading: messages.length === 0 || messages[messages.length - 1]?.persona === 'user'
   };
 
-  return messages.reduce<GameState>((state, msg) => {
+  const finalState = messages.reduce<GameState>((state, msg) => {
     const nextState = { ...state };
 
     nextState.showInstruction = msg.action === 'show_instructions';
-
-
-
 
     nextState.isLoading = msg.persona === 'user';
 
@@ -88,6 +85,9 @@ export const computeGameState = (messages: Message[]): GameState => {
         return nextState;
     }
   }, initialState);
+
+  console.log('Game State Updated:', finalState);
+  return finalState;
 };
 
 const safeJsonParse = (data: string): { message: string; action?: Action } => {
@@ -162,7 +162,7 @@ export const useGuideMessages = (
         addMessage({
             persona: 'guide',
             message: getFloorMessage(gameState),
-            action: 'show_instructions'
+            action: gameState.currentFloor === 1 ? 'show_instructions' : 'none'
         });
     }, [gameState.currentFloor, addMessage]);
 };
