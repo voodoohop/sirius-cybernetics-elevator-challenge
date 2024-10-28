@@ -36,7 +36,7 @@ const appendIfNotDuplicate = (message: Message) => {
 export const computeGameState = (messages: Message[]): GameState => {
   const initialState: GameState = {
     currentFloor: GAME_CONFIG.INITIAL_FLOOR,
-    movesLeft: GAME_CONFIG.TOTAL_MOVES - messages.filter(m => m.persona === 'user').length,
+    movesLeft: GAME_CONFIG.TOTAL_MOVES - messages.filter(m => m.persona === 'elevator').length,
     currentPersona: 'elevator',
     firstStageComplete: false,
     hasWon: false,
