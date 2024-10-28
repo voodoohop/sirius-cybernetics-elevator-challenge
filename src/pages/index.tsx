@@ -139,6 +139,13 @@ export default function Index() {
           </h1>
           <h2 className="text-xl font-semibold text-green-400">Happy Vertical People Transporter</h2>
           
+          {/* Add moves remaining display */}
+          {messages.length > 0 && (
+            <div className="text-sm text-yellow-400">
+              Moves Remaining: {gameState.movesLeft}
+            </div>
+          )}
+          
           {getInstructionMessage()}
 
           <Button
