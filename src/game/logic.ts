@@ -10,6 +10,7 @@ import {
 import { fetchFromPollinations } from '@/utils/api';
 import { getPersonaPrompt } from '@/prompts';
 import { getFloorMessage } from '@/prompts';
+import { findMarvinJoinStartIndex, rewindMessages } from './rewind';
 
 // Core message management hook
 export const useMessages = () => {
@@ -194,51 +195,6 @@ export const useAutonomousConversation = (
 
     return () => clearTimeout(timer);
   }, [messages, gameState, addMessage]);
-};
-
-// Add this helper function near the top
-const findMarvinTransitionIndex = (messages: Message[]): number => {
-  return messages.findIndex(msg => 
-    msg.persona === 'guide' && 
-    msg.message === GAME_CONFIG.MARVIN_TRANSITION_MSG
-  );
-};
-
-// Update the helper function to find the start of the Marvin join interaction
-const findMarvinJoinStartIndex = (messages: Message[]): number => {
-  const marvinJoinIndex = messages.findIndex(msg => 
-    msg.persona === 'marvin' && msg.action === 'join'
-  );
-  
-  if (marvinJoinIndex === -1) return -1;
-  
-  // Find the user message that triggered this interaction
-  for (let i = marvinJoinIndex - 1; i >= 0; i--) {
-    if (messages[i].persona === 'user') {
-      return i;
-    }
-  }
-  
-  return marvinJoinIndex;
-};
-
-// Helper function to gradually remove messages
-const rewindMessages = (
-  messages: Message[], 
-  targetIndex: number,
-  setMessages: React.Dispatch<React.SetStateAction<Message[]>>
-) => {
-  let currentIndex = messages.length;
-  
-  const removeMessage = () => {
-    if (currentIndex > targetIndex) {
-      currentIndex--;
-      setMessages(messages.slice(0, currentIndex));
-      setTimeout(removeMessage, 300);
-    }
-  };
-
-  removeMessage();
 };
 
 export const useMessageHandlers = (
