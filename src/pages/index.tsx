@@ -213,7 +213,10 @@ export default function Index() {
             )}
 
             <div className="h-64 overflow-y-auto space-y-2 p-2 bg-gray-800 border border-green-400">
-              {messages.map((msg, index) => (
+              {messages
+                // remove first message
+                .slice(1)
+                .map((msg, index) => (
                 <MessageDisplay 
                   key={index} 
                   msg={msg} 
