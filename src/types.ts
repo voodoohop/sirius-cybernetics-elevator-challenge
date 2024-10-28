@@ -68,12 +68,12 @@ export type GameState = {
   hasWon: boolean;
   conversationMode: 'user-interactive' | 'autonomous';
   lastSpeaker: 'marvin' | 'elevator' | null;
-  marvinJoined: boolean;  // New property to track if Marvin is in the elevator
+  marvinJoined: boolean;
+  isLoading: boolean;  // Added this
 }
 
 export type UiState = {
   input: string;
-  isLoading: boolean;
   showInstruction: boolean;
 }
 

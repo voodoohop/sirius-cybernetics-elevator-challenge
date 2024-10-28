@@ -2,7 +2,6 @@ import { useState, useCallback, useMemo, useEffect } from 'react';
 import { 
   GameState, 
   Message, 
-  GameAction, 
   Persona, 
   GAME_CONFIG,
   PollingsMessage,
@@ -42,11 +41,13 @@ export const computeGameState = (messages: Message[]): GameState => {
     hasWon: false,
     conversationMode: 'user-interactive',
     lastSpeaker: null,
-    marvinJoined: false
+    marvinJoined: false,
+    isLoading: messages.length === 0 || messages[messages.length - 1]?.persona === 'user'
   };
 
   return messages.reduce<GameState>((state, msg) => {
     const nextState = { ...state };
+    nextState.isLoading = msg.persona === 'user';
 
     if (msg.persona === 'guide' && msg.message === GAME_CONFIG.MARVIN_TRANSITION_MSG) {
       nextState.currentPersona = 'marvin' as const;
@@ -238,16 +239,15 @@ export const useMessageHandlers = (
   setMessages: React.Dispatch<React.SetStateAction<Message[]>> // Add this parameter
 ) => {
   const handleGuideAdvice = useCallback(async () => {
-    if (uiState.isLoading) return;
+    if (gameState.isLoading) return;
     
-    setUiState((prev: UiState) => ({ ...prev, isLoading: true }));
     try {
       const response = await fetchPersonaMessage('guide', gameState, messages);
       addMessage(response);
-    } finally {
-      setUiState((prev: UiState) => ({ ...prev, isLoading: false }));
+    } catch (error) {
+      console.error('Error fetching guide advice:', error);
     }
-  }, [gameState.currentFloor, messages, uiState.isLoading, setUiState, addMessage]);
+  }, [gameState, messages, addMessage]);
 
   const handlePersonaSwitch = useCallback(() => {
     if (gameState.conversationMode === 'autonomous') {

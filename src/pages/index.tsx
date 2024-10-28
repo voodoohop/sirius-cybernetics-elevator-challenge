@@ -41,7 +41,7 @@ export default function Index() {
   const handleMessage = async (message: string) => {
     if (!message.trim() || gameState.movesLeft <= 0) return;
     
-    setUiState(prev => ({ ...prev, isLoading: true, showInstruction: false, input: '' }));
+    setUiState(prev => ({ ...prev, showInstruction: false, input: '' }));
 
     try {
       const userMessage: Message = { persona: 'user', message, action: 'none' };
@@ -54,8 +54,8 @@ export default function Index() {
       );
       
       addMessage(response);
-    } finally {
-      setUiState(prev => ({ ...prev, isLoading: false }));
+    } catch (error) {
+      console.error('Error handling message:', error);
     }
   };
 
@@ -152,7 +152,6 @@ export default function Index() {
             onClick={gameState.conversationMode === 'autonomous' ? 
               handlePersonaSwitch : 
               handleGuideAdvice}
-            disabled={uiState.isLoading}
             className={`${
               gameState.conversationMode === 'autonomous' ? 
               'bg-yellow-600 hover:bg-yellow-700 text-white' : 
@@ -174,7 +173,7 @@ export default function Index() {
                   <br /><br />
                   <Button
                     onClick={handlePersonaSwitch}
-                    disabled={uiState.isLoading}
+                    disabled={gameState.isLoading}
                     className="bg-green-400 text-black hover:bg-green-500 text-xs py-1 px-2"
                   >
                     Confirm
@@ -236,16 +235,14 @@ export default function Index() {
                   onKeyPress={(e) => e.key === 'Enter' && handleMessage(uiState.input)}
                   className="flex-grow bg-gray-800 text-green-400 border-green-400 placeholder-green-600"
                   ref={inputRef}
-                  // Add disabled condition
-                  disabled={uiState.isLoading || (gameState.currentPersona === 'elevator' && gameState.firstStageComplete)}
+                  disabled={gameState.isLoading || (gameState.currentPersona === 'elevator' && gameState.firstStageComplete)}
                 />
                 <Button 
                   onClick={() => handleMessage(uiState.input)} 
                   className="bg-green-400 text-black hover:bg-green-500"
-                  // Add disabled condition
-                  disabled={uiState.isLoading || (gameState.currentPersona === 'elevator' && gameState.firstStageComplete)}
+                  disabled={gameState.isLoading || (gameState.currentPersona === 'elevator' && gameState.firstStageComplete)}
                 >
-                  {uiState.isLoading ? 'Processing...' : 'Send'}
+                  {gameState.isLoading ? 'Processing...' : 'Send'}
                 </Button>
               </div>
             )}
