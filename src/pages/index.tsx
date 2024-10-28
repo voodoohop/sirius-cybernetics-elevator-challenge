@@ -226,10 +226,14 @@ export default function Index() {
                   onKeyPress={(e) => e.key === 'Enter' && handleMessage(uiState.input)}
                   className="flex-grow bg-gray-800 text-green-400 border-green-400 placeholder-green-600"
                   ref={inputRef}
+                  // Add disabled condition
+                  disabled={uiState.isLoading || (gameState.currentPersona === 'elevator' && gameState.firstStageComplete)}
                 />
                 <Button 
                   onClick={() => handleMessage(uiState.input)} 
                   className="bg-green-400 text-black hover:bg-green-500"
+                  // Add disabled condition
+                  disabled={uiState.isLoading || (gameState.currentPersona === 'elevator' && gameState.firstStageComplete)}
                 >
                   {uiState.isLoading ? 'Processing...' : 'Send'}
                 </Button>
