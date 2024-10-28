@@ -156,13 +156,6 @@ export const useGuideMessages = (
     // floor changed
     useEffect(() => {
         if (gameState.currentFloor === 5) {
-            if (gameState.marvinJoined)
-                addMessage({
-                    persona: 'guide',
-                    message: 'Pan Galactic Gargle Blasters are being prepared for your enjoyment. Even Marvin will enjoy one!',
-                    action: 'none'
-                });
-            else 
             addMessage({
                 persona: 'guide',
                 message: `Now arriving at floor ${gameState.currentFloor}... The Pan Galactic Gargle Blasters are being prepared, but they're only served to a minimum of two people. Perhaps Marvin would enjoy one? (Though he'd probably just complain about it...)`,
@@ -175,7 +168,7 @@ export const useGuideMessages = (
                 action: 'none'
             });
         }
-    }, [gameState.currentFloor, gameState.marvinJoined, addMessage]);
+    }, [gameState.currentFloor,  addMessage]);
 };
 
 // Autonomous conversation hook
@@ -233,7 +226,6 @@ const findMarvinJoinStartIndex = (messages: Message[]): number => {
 export const useMessageHandlers = (
   gameState: GameState,
   messages: Message[],
-  uiState: UiState,
   setUiState: React.Dispatch<React.SetStateAction<UiState>>,
   addMessage: (message: Message) => void,
   setMessages: React.Dispatch<React.SetStateAction<Message[]>> // Add this parameter
@@ -258,7 +250,6 @@ export const useMessageHandlers = (
         setUiState(prev => ({ 
           ...prev, 
           showInstruction: true,
-          isLoading: false,
           input: ''
         }));
       }

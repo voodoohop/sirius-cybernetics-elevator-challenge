@@ -30,7 +30,6 @@ export default function Index() {
   const gameState = useGameState(messages);
   const [uiState, setUiState] = useUiState({
     input: '',
-    isLoading: false,
     showInstruction: true
   });
 
@@ -67,7 +66,6 @@ export default function Index() {
   } = useMessageHandlers(
     gameState,
     messages,
-    uiState,
     setUiState,
     addMessage,
     setMessages
@@ -79,6 +77,13 @@ export default function Index() {
     }
   }, [gameState.firstStageComplete, gameState.currentPersona, setUiState]);
 
+  useEffect(() => {
+    // Focus input when it becomes enabled
+    if (!gameState.isLoading && !gameState.firstStageComplete && inputRef.current) {
+      inputRef.current.focus();
+    }
+  }, [gameState.isLoading, gameState.firstStageComplete]);
+
   const getInstructionMessage = () => {
     if (gameState.hasWon) return null;
     
@@ -89,7 +94,6 @@ export default function Index() {
           <AlertCircle className="w-5 h-5" />
           <div>
             <p>The conversation is now autonomous. Don't panic! This is perfectly normal behavior for Sirius Cybernetics products.</p>
-            <p>Sit back and watch the fascinating interaction between these two Genuine People Personalities™...</p>
           </div>
         </div>
       </div>

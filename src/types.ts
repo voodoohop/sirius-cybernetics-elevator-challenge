@@ -72,7 +72,7 @@ export type GameState = {
   isLoading: boolean;  // Added this
 }
 
-export type UiState = {
+export interface UiState {
   input: string;
   showInstruction: boolean;
 }
