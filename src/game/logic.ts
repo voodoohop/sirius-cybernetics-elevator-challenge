@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { 
   GameState, 
   Message, 
@@ -7,50 +7,79 @@ import {
   GAME_CONFIG,
   PollingsMessage,
   UiState,
-  Action,  // Add this import
+  Action,
 } from '@/types';
 import { fetchFromPollinations } from '@/utils/api';
 import { getPersonaPrompt } from '@/prompts';
 
-export const messagesToGameState = (messages: Message[]): GameState => {
-  const state: GameState = {
+// Core message management hook
+export const useMessages = () => {
+  const [messages, setMessages] = useState<Message[]>([]);
+
+  const addMessage = useCallback((message: Message) => {
+    setMessages(appendIfNotDuplicate(message));
+  }, []);
+
+  return { messages, addMessage, setMessages };
+};
+
+// append only if the last message is not the same
+const appendIfNotDuplicate = (message: Message) => {
+    return (messages: Message[]) => {
+        const stringifiedMessage = JSON.stringify(message);
+        const lastMessage = JSON.stringify(messages[messages.length - 1]);
+        return lastMessage !== stringifiedMessage ? [...messages, message] : messages;
+    }
+};
+
+// Pure function to compute game state from messages
+export const computeGameState = (messages: Message[]): GameState => {
+  const initialState: GameState = {
     currentFloor: GAME_CONFIG.INITIAL_FLOOR,
     movesLeft: GAME_CONFIG.TOTAL_MOVES - messages.filter(m => m.persona === 'user').length,
     currentPersona: 'elevator',
     firstStageComplete: false,
     hasWon: false,
-    messages,
     conversationMode: 'user-interactive',
     lastSpeaker: null,
     marvinJoined: false
   };
 
-  messages.forEach(msg => {
-    if (msg.persona === 'guide' && msg.message === 'Switching to Marvin mode...') {
-      state.currentPersona = 'marvin';
+  return messages.reduce<GameState>((state, msg) => {
+    const nextState = { ...state };
+
+    if (msg.persona === 'guide' && msg.message === GAME_CONFIG.MARVIN_TRANSITION_MSG) {
+      nextState.currentPersona = 'marvin' as const;
     }
 
     switch (msg.action) {
       case 'join':
-        state.conversationMode = 'autonomous';
-        state.lastSpeaker = 'marvin';
-        state.marvinJoined = true;  // Set marvinJoined instead of hasWon
-        break;
-      case 'up':
-        state.currentFloor = Math.min(GAME_CONFIG.FLOORS, state.currentFloor + 1);
-        // Set hasWon when they reach the top floor together
-        if (state.marvinJoined && state.currentFloor === GAME_CONFIG.FLOORS) {
-          state.hasWon = true;
-        }
-        break;
-      case 'down':
-        state.currentFloor = Math.max(1, state.currentFloor - 1);
-        if (state.currentFloor === 1) state.firstStageComplete = true;
-        break;
+        return {
+          ...nextState,
+          conversationMode: 'autonomous' as const,
+          lastSpeaker: 'marvin',
+          marvinJoined: true
+        };
+      case 'up': {
+        const newFloor = Math.min(GAME_CONFIG.FLOORS, state.currentFloor + 1);
+        return {
+          ...nextState,
+          currentFloor: newFloor,
+          hasWon: state.marvinJoined && newFloor === GAME_CONFIG.FLOORS
+        };
+      }
+      case 'down': {
+        const newFloor = Math.max(1, state.currentFloor - 1);
+        return {
+          ...nextState,
+          currentFloor: newFloor,
+          firstStageComplete: newFloor === 1
+        };
+      }
+      default:
+        return nextState;
     }
-  });
-
-  return state;
+  }, initialState);
 };
 
 const safeJsonParse = (data: string): { message: string; action?: Action } => {
@@ -66,7 +95,7 @@ const isValidFloor = (floor: number): floor is 1 | 2 | 3 | 4 | 5 => {
   return floor >= 1 && floor <= 5;
 };
 
-const fetchPersonaMessage = async (
+export const fetchPersonaMessage = async (
   persona: Persona, 
   floor: number,
   existingMessages: Message[] = [],
@@ -78,11 +107,11 @@ const fetchPersonaMessage = async (
 
     const messages: PollingsMessage[] = [
       {
-        role: 'system',
+        role: 'system' as const,
         content: getPersonaPrompt(persona, floor)
       },
       ...existingMessages.map(msg => ({
-        role: (msg.persona === 'user' ? 'user' : 'assistant') as ('user' | 'system' | 'assistant'),
+        role: (msg.persona === 'user' ? 'user' : 'assistant') as const,
         content: JSON.stringify({ message: msg.message, action: msg.action }),
         ...(msg.persona !== 'user' && { name: msg.persona })
       }))
@@ -102,145 +131,137 @@ const fetchPersonaMessage = async (
   }
 };
 
-export const useGameState = (): [GameState, React.Dispatch<GameAction>] => {
-  const [messages, setMessages] = useState<Message[]>([]);
-  // Ensure no duplicate initial messages
-  // ...
-  
-  const dispatch = useCallback((action: GameAction) => {
-    console.log('Dispatching action:', action);
-    switch (action.type) {
-      case 'ADD_MESSAGE':
-        setMessages(prev => [...prev, action.message]);
-        break;
-      case 'SWITCH_PERSONA':
-        setMessages(prev => [
-          ...prev,
-          { persona: 'guide', message: 'Switching to Marvin mode...', action: 'none' }
-        ]);
-        break;
-      case 'START_AUTONOMOUS':
-        // This will trigger the autonomous conversation
-        setMessages(prev => [
-          ...prev,
-          { 
-            persona: 'guide', 
-            message: 'Marvin has joined the elevator. Let\'s see how this goes...', 
-            action: 'none' 
-          }
-        ]);
-        break;
-    }
-  }, []);
+// Game state management hook
+export const useGameState = (messages: Message[]) => {
+  return useMemo(() => computeGameState(messages), [messages]);
+};
 
-  return [messagesToGameState(messages), dispatch];
+// Effect hook for guide messages
+export const useGuideMessages = (
+  gameState: GameState, 
+  messages: Message[], 
+  addMessage: (message: Message) => void
+) => {
+    const lastMessage = messages[messages.length - 1];
+
+    // marvin joined 
+    useEffect(() => {
+        if (lastMessage?.action === 'join') {
+            addMessage({
+                persona: 'guide',
+                message: 'Marvin has joined the elevator. Now sit back and watch the fascinating interaction between these two Genuine People Personalities™...',
+                action: 'none'
+            });
+        }
+    }, [lastMessage, addMessage]);
+
+    // floor changed
+    useEffect(() => {
+        addMessage({
+            persona: 'guide',
+            message: `Now arriving at floor ${gameState.currentFloor}...`,
+            action: 'none'
+        });
+    }, [gameState.currentFloor, addMessage]);
+};
+
+// Autonomous conversation hook
+export const useAutonomousConversation = (
+  gameState: GameState,
+  messages: Message[],
+  addMessage: (message: Message) => void
+) => {
+  useEffect(() => {
+    if (gameState.conversationMode !== 'autonomous' || messages.length === 0) return;
+
+    const lastMessage = messages[messages.length - 1];
+    const nextSpeaker = lastMessage.persona === 'marvin' ? 'elevator' : 'marvin';
+    const delay = 1000 + (messages.length * 500);
+
+    const timer = setTimeout(async () => {
+      const response = await fetchPersonaMessage(
+        nextSpeaker,
+        gameState.currentFloor,
+        messages
+      );
+      addMessage(response);
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [messages, gameState.conversationMode, gameState.currentFloor, addMessage]);
+};
+
+// Add this helper function near the top
+const findMarvinTransitionIndex = (messages: Message[]): number => {
+  return messages.findIndex(msg => 
+    msg.persona === 'guide' && 
+    msg.message === GAME_CONFIG.MARVIN_TRANSITION_MSG
+  );
+};
+
+// Update the helper function to find the start of the Marvin join interaction
+const findMarvinJoinStartIndex = (messages: Message[]): number => {
+  const marvinJoinIndex = messages.findIndex(msg => 
+    msg.persona === 'marvin' && msg.action === 'join'
+  );
+  
+  if (marvinJoinIndex === -1) return -1;
+  
+  // Find the user message that triggered this interaction
+  for (let i = marvinJoinIndex - 1; i >= 0; i--) {
+    if (messages[i].persona === 'user') {
+      return i;
+    }
+  }
+  
+  return marvinJoinIndex;
 };
 
 export const useMessageHandlers = (
-  gameState: GameState, 
-  dispatch: React.Dispatch<GameAction>,
-  uiState: UiState,
-  setUiState: React.Dispatch<React.SetStateAction<UiState>>
-) => ({
-  handleMessage: async (message: string) => {
-    if (!message.trim() || gameState.movesLeft <= 0) return;
-    
-    if (message === GAME_CONFIG.CHEAT_CODE) {
-      dispatch({ type: 'CHEAT_CODE' });
-      setUiState(prev => ({ ...prev, input: '' }));
-      return;
-    }
-
-    setUiState(prev => ({ ...prev, isLoading: true, showInstruction: false, input: '' }));
-
-    try {
-      const userMessage: Message = { persona: 'user', message, action: 'none' };
-      dispatch({ type: 'ADD_MESSAGE', message: userMessage });
-
-      const response = await fetchPersonaMessage(
-        gameState.currentPersona, 
-        gameState.currentFloor,
-        [...gameState.messages, userMessage]
-      );
-      
-      dispatch({ type: 'ADD_MESSAGE', message: response });
-    } finally {
-      setUiState(prev => ({ ...prev, isLoading: false }));
-    }
-  },
-
-  handleGuideAdvice: async () => {
-    setUiState(prev => ({ ...prev, isLoading: true }));
-    try {
-      const advice = await fetchPersonaMessage('guide', 1, gameState.messages);
-      dispatch({ type: 'ADD_MESSAGE', message: advice });
-    } finally {
-      setUiState(prev => ({ ...prev, isLoading: false }));
-    }
-  },
-
-  handlePersonaSwitch: async () => {
-    dispatch({ type: 'SWITCH_PERSONA', persona: 'marvin' });    
-    const message = await fetchPersonaMessage('marvin', 1);
-    dispatch({ type: 'ADD_MESSAGE', message });
-    setUiState(prev => ({ ...prev, showInstruction: true }));
-  }
-});
-
-export const useInitialMessage = (gameState: GameState, dispatch: React.Dispatch<GameAction>) => {
-  const mounted = useRef(false);
-  useEffect(() => {
-    if (!mounted.current && gameState.currentPersona === 'elevator') { 
-      fetchPersonaMessage(gameState.currentPersona, gameState.currentFloor)
-        .then(message => dispatch({ type: 'ADD_MESSAGE', message }));
-      mounted.current = true;
-    }
-  }, [gameState.currentPersona, gameState.currentFloor, dispatch]);
-};
-
-export const useMessageScroll = (messages: Message[]) => {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    ref.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-  return ref;
-};
-
-export const useInput = (isLoading: boolean) => {
-  const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (!isLoading && ref.current) {
-      ref.current.focus();
-    }
-  }, [isLoading]);
-  return { inputRef: ref };
-};
-
-export const useUiState = (initial: UiState) => useState<UiState>(initial);
-
-export const useAutonomousConversation = (
   gameState: GameState,
-  dispatch: React.Dispatch<GameAction>
+  messages: Message[],
+  uiState: UiState,
+  setUiState: React.Dispatch<React.SetStateAction<UiState>>,
+  addMessage: (message: Message) => void,
+  setMessages: React.Dispatch<React.SetStateAction<Message[]>> // Add this parameter
 ) => {
-  useEffect(() => {
-    if (gameState.conversationMode === 'autonomous' && gameState.messages.length > 0) {
-      const lastMessage = gameState.messages[gameState.messages.length - 1];
-      const nextSpeaker = lastMessage.persona === 'marvin' ? 'elevator' : 'marvin';
-
-      const baseDelay = 2000;
-      const delayIncrement = 500;
-      const delay = baseDelay + (gameState.messages.length * delayIncrement);
-
-      const timer = setTimeout(async () => {
-        const response = await fetchPersonaMessage(
-          nextSpeaker,
-          gameState.currentFloor,
-          gameState.messages
-        );
-        dispatch({ type: 'ADD_MESSAGE', message: response });
-      }, delay);
-
-      return () => clearTimeout(timer);
+  const handleGuideAdvice = useCallback(async () => {
+    if (uiState.isLoading) return;
+    
+    setUiState((prev: UiState) => ({ ...prev, isLoading: true }));
+    try {
+      const response = await fetchPersonaMessage('guide', gameState.currentFloor, messages);
+      addMessage(response);
+    } finally {
+      setUiState((prev: UiState) => ({ ...prev, isLoading: false }));
     }
-  }, [gameState.messages, gameState.conversationMode, gameState.currentFloor, dispatch]);
+  }, [gameState.currentFloor, messages, uiState.isLoading, setUiState, addMessage]);
+
+  const handlePersonaSwitch = useCallback(() => {
+    if (gameState.conversationMode === 'autonomous') {
+      // Rewind functionality
+      const rewindIndex = findMarvinJoinStartIndex(messages);
+      if (rewindIndex !== -1) {
+        setMessages(messages.slice(0, rewindIndex));
+        setUiState(prev => ({ 
+          ...prev, 
+          showInstruction: true,
+          isLoading: false,
+          input: ''
+        }));
+      }
+    } else {
+      // Original transition to Marvin functionality
+      addMessage({
+        persona: 'guide',
+        message: GAME_CONFIG.MARVIN_TRANSITION_MSG,
+        action: 'none'
+      });
+    }
+  }, [messages, gameState.conversationMode, setMessages, setUiState, addMessage]);
+
+  return {
+    handleGuideAdvice,
+    handlePersonaSwitch
+  };
 };

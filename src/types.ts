@@ -5,7 +5,8 @@ export const GAME_CONFIG = {
   FLOORS: 5,
   INITIAL_FLOOR: 3,
   TOTAL_MOVES: 15,
-  CHEAT_CODE: "42"
+  CHEAT_CODE: "42",
+  MARVIN_TRANSITION_MSG: 'Marvin is waiting outside the elevator, looking particularly gloomy today...'
 } as const;
 
 // Message Display Configuration
@@ -46,6 +47,7 @@ export const API_CONFIG = {
   MAX_RETRIES: 3,
   RETRY_DELAY: 1000,
   ENDPOINT: 'https://text.pollinations.ai/openai'
+//   ENDPOINT: 'http://localhost:16385/openai'
 } as const;
 
 // Game Types
@@ -81,7 +83,8 @@ export type GameAction =
   | { type: 'ADD_MESSAGE'; message: Message }
   | { type: 'SWITCH_PERSONA'; persona: Persona }
   | { type: 'START_AUTONOMOUS' }
-  | { type: 'END_GAME' };
+  | { type: 'END_GAME' }
+  | { type: 'REWIND_TO_PRE_MARVIN' };  // Add this line
 
 // API Types
 export type PollingsMessage = {
