@@ -166,7 +166,6 @@ export default function Index() {
                   <br /><br />
                   <Button
                     onClick={handlePersonaSwitch}
-                    disabled={gameState.isLoading}
                     className="bg-green-400 text-black hover:bg-green-500 text-xs py-1 px-2"
                   >
                     Confirm
@@ -228,12 +227,12 @@ export default function Index() {
                   onKeyPress={(e) => e.key === 'Enter' && handleMessage(inputPrompt)}
                   className="flex-grow bg-gray-800 text-green-400 border-green-400 placeholder-green-600"
                   ref={inputRef}
-                  disabled={gameState.isLoading || (gameState.currentPersona === 'elevator' && gameState.firstStageComplete)}
+                  disabled={gameState.isLoading}
                 />
                 <Button 
                   onClick={() => handleMessage(inputPrompt)} 
                   className="bg-green-400 text-black hover:bg-green-500"
-                  disabled={gameState.isLoading || (gameState.currentPersona === 'elevator' && gameState.firstStageComplete)}
+                  disabled={gameState.isLoading}
                 >
                   {gameState.isLoading ? 'Processing...' : 'Send'}
                 </Button>

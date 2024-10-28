@@ -55,7 +55,7 @@ export type Persona = 'user' | 'marvin' | 'elevator' | 'guide';
 export type Action = 'none' | 'join' | 'up' | 'down' | 'show_instructions';
 
 export type Message = {
-  persona: 'user' | 'marvin' | 'elevator' | 'guide';
+  persona: Persona;
   message: string;
   action: Action;
 }
@@ -70,7 +70,7 @@ export type GameState = {
   lastSpeaker: 'marvin' | 'elevator' | null;
   marvinJoined: boolean;
   showInstruction: boolean;
-  isLoading: boolean;  // Added this
+  isLoading: boolean;
 }
 
 export type GameAction =

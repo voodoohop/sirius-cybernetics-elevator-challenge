@@ -43,7 +43,7 @@ export const computeGameState = (messages: Message[]): GameState => {
     lastSpeaker: null,
     marvinJoined: false,
     showInstruction: true,
-    isLoading: messages.length === 0 || messages[messages.length - 1]?.persona === 'user'
+    isLoading: false,
   };
 
   const finalState = messages.reduce<GameState>((state, msg) => {
@@ -56,6 +56,8 @@ export const computeGameState = (messages: Message[]): GameState => {
     if (msg.persona === 'guide' && msg.message === GAME_CONFIG.MARVIN_TRANSITION_MSG) {
       nextState.currentPersona = 'marvin' as const;
     }
+
+
 
     switch (msg.action) {
       case 'join':
@@ -84,6 +86,7 @@ export const computeGameState = (messages: Message[]): GameState => {
       default:
         return nextState;
     }
+
   }, initialState);
 
   console.log('Game State Updated:', finalState);
