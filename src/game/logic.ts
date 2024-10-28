@@ -108,7 +108,7 @@ export const fetchPersonaMessage = async (
         content: getPersonaPrompt(persona, gameState)
       },
       ...existingMessages.map(msg => ({
-        role: (msg.persona === 'user' ? 'user' : 'assistant') as const,
+        role: msg.persona === 'user' ? 'user' as const : 'assistant' as const,
         content: JSON.stringify({ message: msg.message, action: msg.action }),
         ...(msg.persona !== 'user' && { name: msg.persona })
       }))

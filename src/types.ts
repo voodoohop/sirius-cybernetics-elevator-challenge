@@ -51,7 +51,7 @@ export const API_CONFIG = {
 } as const;
 
 // Game Types
-export type Persona = keyof typeof MESSAGE_STYLES;
+export type Persona = 'user' | 'marvin' | 'elevator' | 'guide';
 export type Action = 'none' | 'join' | 'up' | 'down';
 
 export type Message = {
@@ -66,7 +66,6 @@ export type GameState = {
   currentPersona: Persona;
   firstStageComplete: boolean;
   hasWon: boolean;
-  messages: Message[];
   conversationMode: 'user-interactive' | 'autonomous';
   lastSpeaker: 'marvin' | 'elevator' | null;
   marvinJoined: boolean;  // New property to track if Marvin is in the elevator
