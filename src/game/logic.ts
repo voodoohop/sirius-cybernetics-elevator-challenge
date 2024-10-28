@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { 
   GameState, 
   Message, 
@@ -189,27 +189,6 @@ export const useAutonomousConversation = (
   }, [messages, gameState.conversationMode, gameState.currentFloor, addMessage]);
 };
 
-export const useMessageScroll = (messages: Message[]) => {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    ref.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages]);
-  return ref;
-};
-
-export const useInput = (isLoading: boolean) => {
-  const ref = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    if (!isLoading && ref.current) {
-      ref.current.focus();
-    }
-  }, [isLoading]);
-  return { inputRef: ref };
-};
-
-export const useUiState = (initial: UiState) => useState<UiState>(initial);
-
-// Add this new hook
 export const useMessageHandlers = (
   gameState: GameState,
   messages: Message[],

@@ -11,13 +11,17 @@ import {
   useGameState, 
   useMessageHandlers,  
   useGuideMessages,
-  useMessageScroll, 
-  useInput, 
-  useUiState,
   useAutonomousConversation,
   useMessages,
   fetchPersonaMessage
 } from '@/game/logic'
+
+import {
+  useMessageScroll,
+  useInput,
+  useUiState
+} from '@/hooks/ui'
+
 import { GargleBlaster } from '@/components/GargleBlaster';
 import { Message } from '@/types'
 
