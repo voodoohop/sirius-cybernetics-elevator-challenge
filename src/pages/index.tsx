@@ -135,7 +135,7 @@ export default function Index() {
           {/* Add moves remaining display */}
           {messages.length > 0 && (
             <div className="text-sm text-yellow-400">
-              Moves Remaining: {gameState.movesLeft}
+              Charge Remaining: {gameState.movesLeft}
             </div>
           )}
           
