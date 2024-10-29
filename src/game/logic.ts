@@ -50,7 +50,7 @@ export const computeGameState = (messages: Message[]): GameState => {
   const finalState = messages.reduce<GameState>((state, msg) => {
     const nextState = { ...state };
 
-    nextState.showInstruction = msg.action === 'show_instructions';
+    nextState.showInstruction = msg.action === 'show_instructions' || messages.length <= 3;
 
     nextState.isLoading = msg.persona === 'user';
 
