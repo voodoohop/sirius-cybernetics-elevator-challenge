@@ -59,7 +59,7 @@ const computeGameState = (messages: Message[]): GameState => {
     isLoading: false,
   };
 
-  return messages.reduce<GameState>((state, msg) => {
+  const gameState = messages.reduce<GameState>((state, msg) => {
     const newFloor = calculateNewFloor(state.currentFloor, msg.action);
     
     return {
@@ -73,9 +73,12 @@ const computeGameState = (messages: Message[]): GameState => {
       lastSpeaker: msg.action === 'join' ? 'marvin' : state.lastSpeaker,
       marvinJoined: msg.action === 'join' ? true : state.marvinJoined,
       hasWon: state.marvinJoined && newFloor === GAME_CONFIG.FLOORS,
-      firstStageComplete: newFloor === 1
+      firstStageComplete: state.firstStageComplete || newFloor === 1
     };
   }, initialState);
+
+  console.log('gameState', gameState);
+  return gameState;
 };
 
 const safeJsonParse = (data: string): { message: string; action?: Action } => {
