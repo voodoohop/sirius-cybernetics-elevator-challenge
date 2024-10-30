@@ -11,6 +11,7 @@ import { fetchFromPollinations } from '@/utils/api';
 import { getPersonaPrompt } from '@/prompts';
 import { getFloorMessage } from '@/prompts';
 import { findMarvinJoinStartIndex, rewindMessages } from './rewind';
+import { getMarvinJoinMessage } from '@/prompts';
 
 // Core message management hook
 export const useMessages = () => {
@@ -81,14 +82,6 @@ const computeGameState = (messages: Message[]): GameState => {
   return gameState;
 };
 
-const safeJsonParse = (data: string): { message: string; action?: Action } => {
-  try {
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('JSON parse error:', error);
-    return { message: data };
-  }
-};
 
 
 // Update the fetchPersonaMessage function
@@ -142,14 +135,14 @@ export const useGuideMessages = (
 
     // marvin joined 
     useEffect(() => {
-        if (lastMessage?.action === 'join') {
+        if (lastMessage?.action === 'join' && !gameState.marvinJoined) {
             addMessage({
                 persona: 'guide',
-                message: 'Marvin has joined the elevator. Now sit back and watch the fascinating interaction between these two Genuine People Personalities™...',
+                message: getMarvinJoinMessage(),
                 action: 'none'
             });
         }
-    }, [lastMessage, addMessage]);
+    }, [lastMessage, addMessage, gameState.marvinJoined]);
 
     // floor changed
     useEffect(() => {
@@ -233,3 +226,14 @@ const createMessage = (persona: Persona, message: string, action: Action = 'none
   message,
   action
 });
+
+
+
+const safeJsonParse = (data: string): { message: string; action?: Action } => {
+  try {
+    return JSON.parse(data);
+  } catch (error) {
+    console.error('JSON parse error:', error);
+    return { message: data };
+  }
+};

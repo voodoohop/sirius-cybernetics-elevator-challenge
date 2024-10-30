@@ -164,3 +164,8 @@ export const getPersonaPrompt = (persona: Persona, gameState: GameState) => {
       throw new Error(`Unknown persona: ${persona}`);
   }
 };
+
+// Add this near the other message functions
+export const getMarvinJoinMessage = (): string => {
+  return 'Marvin has joined the elevator. Now sit back and watch the fascinating interaction between these two Genuine People Personalities™...';
+};
