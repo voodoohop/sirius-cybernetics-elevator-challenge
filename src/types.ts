@@ -66,7 +66,7 @@ export type GameState = {
   currentPersona: Persona;
   firstStageComplete: boolean;
   hasWon: boolean;
-  conversationMode: 'user-interactive' | 'autonomous';
+  conversationMode: 'interactive' | 'autonomous';
   lastSpeaker: 'marvin' | 'elevator' | null;
   marvinJoined: boolean;
   showInstruction: boolean;

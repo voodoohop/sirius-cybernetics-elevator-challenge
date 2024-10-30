@@ -217,7 +217,7 @@ export default function Index() {
               <div ref={messagesEndRef} />
             </div>
 
-            {gameState.conversationMode === 'user-interactive' && (
+            {gameState.conversationMode === 'interactive' && (
               <div className="flex space-x-2">
                 <Input
                   type="text"

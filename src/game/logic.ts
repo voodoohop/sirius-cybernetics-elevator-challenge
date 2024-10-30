@@ -23,75 +23,59 @@ export const useMessages = () => {
   return { messages, addMessage, setMessages };
 };
 
-// append only if the last message is not the same
-const appendIfNotDuplicate = (message: Message) => {
-    return (messages: Message[]) => {
-        const stringifiedMessage = JSON.stringify(message);
-        const lastMessage = JSON.stringify(messages[messages.length - 1]);
-        return lastMessage !== stringifiedMessage ? [...messages, message] : messages;
-    }
+// Extract duplicate check logic
+const isDuplicateMessage = (newMessage: Message, lastMessage: Message | undefined): boolean => {
+  if (!lastMessage) return false;
+  return JSON.stringify(newMessage) === JSON.stringify(lastMessage);
 };
 
-// Pure function to compute game state from messages
-export const computeGameState = (messages: Message[]): GameState => {
+// Simplify message append logic
+const appendIfNotDuplicate = (message: Message) => {
+  return (messages: Message[]) => {
+    const lastMessage = messages[messages.length - 1];
+    return isDuplicateMessage(message, lastMessage) ? messages : [...messages, message];
+  };
+};
+
+// Extract floor calculation logic
+const calculateNewFloor = (currentFloor: number, action: Action): number => {
+  if (action === 'up') return Math.min(GAME_CONFIG.FLOORS, currentFloor + 1);
+  if (action === 'down') return Math.max(1, currentFloor - 1);
+  return currentFloor;
+};
+
+// Simplify state updates with composition
+const computeGameState = (messages: Message[]): GameState => {
   const initialState: GameState = {
     currentFloor: GAME_CONFIG.INITIAL_FLOOR,
     movesLeft: GAME_CONFIG.TOTAL_MOVES - messages.filter(m => m.persona === 'elevator').length,
     currentPersona: 'elevator',
     firstStageComplete: false,
     hasWon: false,
-    conversationMode: 'user-interactive',
+    conversationMode: 'interactive',
     lastSpeaker: null,
     marvinJoined: false,
     showInstruction: true,
     isLoading: false,
   };
 
-  const finalState = messages.reduce<GameState>((state, msg) => {
-    const nextState = { ...state };
-
-    nextState.showInstruction = msg.action === 'show_instructions' || messages.length <= 3;
-
-    nextState.isLoading = msg.persona === 'user';
-
-    if (msg.persona === 'guide' && msg.message === GAME_CONFIG.MARVIN_TRANSITION_MSG) {
-      nextState.currentPersona = 'marvin' as const;
-    }
-
-
-
-    switch (msg.action) {
-      case 'join':
-        return {
-          ...nextState,
-          conversationMode: 'autonomous' as const,
-          lastSpeaker: 'marvin',
-          marvinJoined: true
-        };
-      case 'up': {
-        const newFloor = Math.min(GAME_CONFIG.FLOORS, state.currentFloor + 1);
-        return {
-          ...nextState,
-          currentFloor: newFloor,
-          hasWon: state.marvinJoined && newFloor === GAME_CONFIG.FLOORS
-        };
-      }
-      case 'down': {
-        const newFloor = Math.max(1, state.currentFloor - 1);
-        return {
-          ...nextState,
-          currentFloor: newFloor,
-          firstStageComplete: newFloor === 1
-        };
-      }
-      default:
-        return nextState;
-    }
-
+  return messages.reduce<GameState>((state, msg) => {
+    const newFloor = calculateNewFloor(state.currentFloor, msg.action);
+    
+    return {
+      ...state,
+      currentFloor: newFloor,
+      showInstruction: msg.action === 'show_instructions' || messages.length <= 3,
+      isLoading: msg.persona === 'user',
+      currentPersona: msg.persona === 'guide' && msg.message === GAME_CONFIG.MARVIN_TRANSITION_MSG ? 
+        'marvin' : state.currentPersona,
+      conversationMode: msg.action === 'join' ? 'autonomous' : state.conversationMode,
+      lastSpeaker: msg.action === 'join' ? 'marvin' : state.lastSpeaker,
+      marvinJoined: msg.action === 'join' ? true : state.marvinJoined,
+      hasWon: state.marvinJoined && newFloor === GAME_CONFIG.FLOORS,
+      firstStageComplete: newFloor === 1
+    };
   }, initialState);
-
-  console.log('Game State Updated:', finalState);
-  return finalState;
 };
 
 const safeJsonParse = (data: string): { message: string; action?: Action } => {
@@ -110,10 +94,13 @@ export const fetchPersonaMessage = async (
   gameState: GameState,
   existingMessages: Message[] = [],
 ): Promise<Message> => {
+  const createErrorMessage = (error: unknown): Message => 
+    createMessage(persona, "Apologies, I'm experiencing some difficulties.", 'none');
+
   try {
     const messages: PollingsMessage[] = [
       {
-        role: 'system' as const,
+        role: 'system',
         content: getPersonaPrompt(persona, gameState)
       },
       ...existingMessages.map(msg => ({
@@ -126,14 +113,14 @@ export const fetchPersonaMessage = async (
     const data = await fetchFromPollinations(messages);
     const response = safeJsonParse(data.choices[0].message.content);
     
-    return { 
-      persona, 
-      message: typeof response === 'string' ? response : response.message,
-      action: typeof response === 'string' ? 'none' : (response.action || 'none')
-    };
+    return createMessage(
+      persona,
+      typeof response === 'string' ? response : response.message,
+      typeof response === 'string' ? 'none' : (response.action || 'none')
+    );
   } catch (error) {
     console.error('Error:', error);
-    return { persona, message: "Apologies, I'm experiencing some difficulties.", action: 'none' };
+    return createErrorMessage(error);
   }
 };
 
@@ -236,3 +223,10 @@ export const useMessageHandlers = (
     handlePersonaSwitch
   };
 };
+
+// At the top of the file, add these message factory functions
+const createMessage = (persona: Persona, message: string, action: Action = 'none'): Message => ({
+  persona,
+  message,
+  action
+});
