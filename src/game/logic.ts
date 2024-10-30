@@ -54,7 +54,6 @@ const computeGameState = (messages: Message[]): GameState => {
     firstStageComplete: false,
     hasWon: false,
     conversationMode: 'interactive',
-    lastSpeaker: null,
     marvinJoined: false,
     showInstruction: true,
     isLoading: false,
@@ -71,8 +70,7 @@ const computeGameState = (messages: Message[]): GameState => {
       currentPersona: msg.persona === 'guide' && msg.message === GAME_CONFIG.MARVIN_TRANSITION_MSG ? 
         'marvin' : state.currentPersona,
       conversationMode: msg.action === 'join' ? 'autonomous' : state.conversationMode,
-      lastSpeaker: msg.action === 'join' ? 'marvin' : state.lastSpeaker,
-      marvinJoined: msg.action === 'join' ? true : state.marvinJoined,
+      marvinJoined: msg.action === 'join' || state.marvinJoined,
       hasWon: state.marvinJoined && newFloor === GAME_CONFIG.FLOORS,
       firstStageComplete: state.firstStageComplete || newFloor === 1
     };

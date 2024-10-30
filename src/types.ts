@@ -67,7 +67,6 @@ export type GameState = {
   firstStageComplete: boolean;
   hasWon: boolean;
   conversationMode: 'interactive' | 'autonomous';
-  lastSpeaker: 'marvin' | 'elevator' | null;
   marvinJoined: boolean;
   showInstruction: boolean;
   isLoading: boolean;
