@@ -51,11 +51,11 @@ export const API_CONFIG = {
 } as const;
 
 // Game Types
-export type Persona = keyof typeof MESSAGE_STYLES;
-export type Action = 'none' | 'join' | 'up' | 'down';
+export type Persona = 'user' | 'marvin' | 'elevator' | 'guide';
+export type Action = 'none' | 'join' | 'up' | 'down' | 'show_instructions';
 
 export type Message = {
-  persona: 'user' | 'marvin' | 'elevator' | 'guide';
+  persona: Persona;
   message: string;
   action: Action;
 }
@@ -66,16 +66,10 @@ export type GameState = {
   currentPersona: Persona;
   firstStageComplete: boolean;
   hasWon: boolean;
-  messages: Message[];
-  conversationMode: 'user-interactive' | 'autonomous';
-  lastSpeaker: 'marvin' | 'elevator' | null;
-  marvinJoined: boolean;  // New property to track if Marvin is in the elevator
-}
-
-export type UiState = {
-  input: string;
-  isLoading: boolean;
+  conversationMode: 'interactive' | 'autonomous';
+  marvinJoined: boolean;
   showInstruction: boolean;
+  isLoading: boolean;
 }
 
 export type GameAction =

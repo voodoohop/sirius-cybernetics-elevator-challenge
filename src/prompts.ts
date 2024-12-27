@@ -30,6 +30,20 @@ const FLOOR_INSTRUCTIONS = {
   - No further instructions needed.`
 } as const;
 
+// Add this new function near the top of the file
+const getFloorMessage = (gameState: GameState): string => {
+  const { currentFloor } = gameState;
+  
+  if (currentFloor === 5) {
+    return `Now arriving at floor ${currentFloor}... The Pan Galactic Gargle Blasters are being prepared, but they're only served to a minimum of two people. Perhaps Marvin would enjoy one? (Though he'd probably just complain about it...)`;
+  }
+  
+  return `Now arriving at floor ${currentFloor}...`;
+};
+
+// Export the function so it can be used elsewhere
+export { getFloorMessage };
+
 // Updated to accept GameState
 export const getElevatorPrompt = (gameState: GameState) => {
   const { currentFloor } = gameState;
@@ -149,4 +163,9 @@ export const getPersonaPrompt = (persona: Persona, gameState: GameState) => {
     default:
       throw new Error(`Unknown persona: ${persona}`);
   }
+};
+
+// Add this near the other message functions
+export const getMarvinJoinMessage = (): string => {
+  return 'Marvin has joined the elevator. Now sit back and watch the fascinating interaction between these two Genuine People Personalities™...';
 };
