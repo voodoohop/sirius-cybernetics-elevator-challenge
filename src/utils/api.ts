@@ -4,13 +4,12 @@ import {
   API_CONFIG 
 } from '@/types';
 
-const createFetchRequest = (messages: PollingsMessage[], jsonMode = true) => ({
+const createFetchRequest = (messages: PollingsMessage[]) => ({
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     messages,
-    model: 'openai',
-    jsonMode,
+    model: 'openai-large',
     // temperature: 1.2,
     seed: Math.floor(Math.random() * 1000000)
   })
@@ -19,10 +18,7 @@ const createFetchRequest = (messages: PollingsMessage[], jsonMode = true) => ({
 const FALLBACK_RESPONSE: PollingsResponse = {
   choices: [{
     message: {
-      content: JSON.stringify({
-        message: "I apologize, but I'm having trouble processing your request right now.",
-        action: "none"
-      })
+      content: "<thinking>System error occurred</thinking>\nI apologize, but I'm having trouble processing your request right now.\n<action>none</action>"
     }
   }]
 };
@@ -57,15 +53,14 @@ export const retryFetch = async (
 };
 
 export const fetchFromPollinations = async (
-  messages: PollingsMessage[], 
-  jsonMode = true
+  messages: PollingsMessage[]
 ): Promise<PollingsResponse> => {
   try {
     return await retryFetch(
-      () => fetch(API_CONFIG.ENDPOINT, createFetchRequest(messages, jsonMode)),
+      () => fetch(API_CONFIG.ENDPOINT, createFetchRequest(messages))
     );
   } catch (error) {
-    console.error('Error in fetchFromPollinations:', error);
+    console.error('Error fetching from Pollinations:', error);
     return FALLBACK_RESPONSE;
   }
 };

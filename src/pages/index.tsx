@@ -39,7 +39,12 @@ export default function Index() {
     setInputPrompt('');
 
     try {
-      const userMessage: Message = { persona: 'user', message, action: 'none' };
+      const userMessage: Message = { 
+        persona: 'user', 
+        content: message, 
+        action: 'none',
+        timestamp: new Date().toISOString()
+      };
       addMessage(userMessage);
 
       const response = await fetchPersonaMessage(

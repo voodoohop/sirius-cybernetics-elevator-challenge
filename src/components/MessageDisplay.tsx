@@ -22,7 +22,7 @@ const getActionIndicator = (action: Action) => {
 export const MessageDisplay = ({ msg, gameState }: MessageDisplayProps) => (
   <div className={`p-2 ${MESSAGE_STYLES[msg.persona]}`}>
     {MESSAGE_PREFIXES[msg.persona]}
-    {msg.message}
+    {msg.content}
     {msg.persona === 'elevator' && 
      gameState.currentPersona === 'elevator' && 
      getActionIndicator(msg.action)}

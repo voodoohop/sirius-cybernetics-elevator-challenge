@@ -67,7 +67,7 @@ const computeGameState = (messages: Message[]): GameState => {
       currentFloor: newFloor,
       showInstruction: msg.action === 'show_instructions' || messages.length <= 3,
       isLoading: msg.persona === 'user',
-      currentPersona: msg.persona === 'guide' && msg.message === GAME_CONFIG.MARVIN_TRANSITION_MSG ? 
+      currentPersona: msg.persona === 'guide' && msg.content === GAME_CONFIG.MARVIN_TRANSITION_MSG ? 
         'marvin' : state.currentPersona,
       conversationMode: msg.action === 'join' ? 'autonomous' : state.conversationMode,
       marvinJoined: msg.action === 'join' || state.marvinJoined,
@@ -89,31 +89,24 @@ export const fetchPersonaMessage = async (
   existingMessages: Message[] = [],
 ): Promise<Message> => {
   const createErrorMessage = (error: unknown): Message => 
-    createMessage(persona, "Apologies, I'm experiencing some difficulties.", 'none');
+    createMessage(persona, "Apologies, I'm experiencing some difficulties.\n<action>none</action>");
 
   try {
+    const prompt = getPersonaPrompt(persona, gameState);
     const messages: PollingsMessage[] = [
-      {
-        role: 'system',
-        content: getPersonaPrompt(persona, gameState)
-      },
+      { role: 'user', content: prompt },
       ...existingMessages.map(msg => ({
-        role: msg.persona === 'user' ? 'user' as const : 'assistant' as const,
-        content: JSON.stringify({ message: msg.message, action: msg.action }),
-        ...(msg.persona !== 'user' && { name: msg.persona })
+        role: msg.persona === 'user' ? 'user' : 'assistant',
+        content: msg.content + (msg.action !== 'none' ? `\n<action>${msg.action}</action>` : ''),
+        name: msg.persona === 'user' ? undefined : msg.persona
       }))
     ];
 
-    const data = await fetchFromPollinations(messages);
-    const response = safeJsonParse(data.choices[0].message.content);
-    
-    return createMessage(
-      persona,
-      typeof response === 'string' ? response : response.message,
-      typeof response === 'string' ? 'none' : (response.action || 'none')
-    );
+    const response = await fetchFromPollinations(messages, false);
+    const content = last(response.choices[0].message.content.split('</think>'));
+    return createMessage(persona, content);
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error fetching persona message:', error);
     return createErrorMessage(error);
   }
 };
@@ -136,8 +129,9 @@ export const useGuideMessages = (
         if (lastMessage?.action === 'join' && !gameState.marvinJoined) {
             addMessage({
                 persona: 'guide',
-                message: getMarvinJoinMessage(),
-                action: 'none'
+                content: getMarvinJoinMessage(),
+                action: 'none',
+                timestamp: new Date().toISOString()
             });
         }
     }, [lastMessage, addMessage, gameState.marvinJoined]);
@@ -146,8 +140,9 @@ export const useGuideMessages = (
     useEffect(() => {
         addMessage({
             persona: 'guide',
-            message: getFloorMessage(gameState),
-            action: gameState.currentFloor === 1 ? 'show_instructions' : 'none'
+            content: getFloorMessage(gameState),
+            action: gameState.currentFloor === 1 ? 'show_instructions' : 'none',
+            timestamp: new Date().toISOString()
         });
     }, [gameState.currentFloor, addMessage]);
 };
@@ -206,8 +201,9 @@ export const useMessageHandlers = (
       // Original transition to Marvin functionality
       addMessage({
         persona: 'guide',
-        message: GAME_CONFIG.MARVIN_TRANSITION_MSG,
-        action: 'none'
+        content: GAME_CONFIG.MARVIN_TRANSITION_MSG,
+        action: 'none',
+        timestamp: new Date().toISOString()
       });
     }
   }, [messages, gameState.conversationMode, setMessages, addMessage]);
@@ -219,19 +215,24 @@ export const useMessageHandlers = (
 };
 
 // At the top of the file, add these message factory functions
-const createMessage = (persona: Persona, message: string, action: Action = 'none'): Message => ({
+export const extractMoveAction = (content: string): Action => {
+  const actionMatch = content.match(/<action>(.*?)<\/action>/);
+  return (actionMatch?.[1] || 'none') as Action;
+};
+
+export const extractMessageContent = (content: string): string => {
+  return content
+    .replace(/<thinking>.*?<\/thinking>/s, '')
+    .replace(/<action>.*?<\/action>/s, '')
+    .trim();
+};
+
+export const createMessage = (persona: Persona, content: string): Message => ({
   persona,
-  message,
-  action
+  content: extractMessageContent(content),
+  action: extractMoveAction(content),
+  timestamp: new Date().toISOString()
 });
 
 
-
-const safeJsonParse = (data: string): { message: string; action?: Action } => {
-  try {
-    return JSON.parse(data);
-  } catch (error) {
-    console.error('JSON parse error:', error);
-    return { message: data };
-  }
-};
+const last = <T extends unknown>(array: T[]): T => array[array.length - 1];

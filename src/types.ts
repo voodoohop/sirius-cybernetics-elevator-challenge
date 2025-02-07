@@ -56,8 +56,9 @@ export type Action = 'none' | 'join' | 'up' | 'down' | 'show_instructions';
 
 export type Message = {
   persona: Persona;
-  message: string;
+  content: string;
   action: Action;
+  timestamp: string;
 }
 
 export type GameState = {
