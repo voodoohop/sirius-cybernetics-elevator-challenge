@@ -9,7 +9,7 @@ const createFetchRequest = (messages: PollingsMessage[], jsonMode = true) => ({
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     messages,
-    model: 'mistral',
+    model: 'openai-large',
     jsonMode,
     // temperature: 1.2,
     seed: Math.floor(Math.random() * 1000000)
