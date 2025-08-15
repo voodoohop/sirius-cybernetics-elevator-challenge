@@ -9,7 +9,7 @@ const createFetchRequest = (messages: PollingsMessage[], jsonMode = true) => ({
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     messages,
-    model: 'claude',
+    model: 'openai-large',
     jsonMode,
     referrer: 'pollinations.github.io',
     // temperature: 1.2,
@@ -41,7 +41,14 @@ export const retryFetch = async (
       const response = await operation();
       if (!response.ok) throw new Error(`HTTP error ${response.status}`);
       
-      const data = await response.json();
+      const text = await response.text();
+      console.log('Raw API response:', text.substring(0, 200) + '...');
+      
+      if (!text.trim()) {
+        throw new Error('Empty response from API');
+      }
+      
+      const data = JSON.parse(text);
       return data as PollingsResponse;
     } catch (error) {
       lastError = error as Error;
@@ -62,6 +69,11 @@ export const fetchFromPollinations = async (
   jsonMode = true
 ): Promise<PollingsResponse> => {
   try {
+    // Add small delay for first request to avoid timing issues
+    if (messages.length === 1) {
+      await delay(100);
+    }
+    
     return await retryFetch(
       () => fetch(API_CONFIG.ENDPOINT, createFetchRequest(messages, jsonMode)),
     );
